@@ -29,6 +29,8 @@ export interface ActiveTimer {
   createdAt: number
   /** 超时提醒确认过的时间点：之后才重新计算是否超时 */
   ackAt: number | null
+  /** 修订号：每次状态转换 +1，用于识别其他标签页的过期操作（旧数据没有此字段，按 0 处理） */
+  rev?: number
 }
 
 export interface Settings {

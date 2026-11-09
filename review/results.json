@@ -1,0 +1,96 @@
+{
+  "reviewDate": "2026-11-09",
+  "baselineCommit": "d22d65e",
+  "originalTests": 32,
+  "addedTests": 53,
+  "productionSourceModified": false,
+  "testEnvironment": "Node.js v24.22.0; Vitest 5.1.0; Dexie 4.4.7; fake-indexeddb 6.2.8; mocked network; virtual clock",
+  "runs": [
+    {
+      "timezone": "Asia/Shanghai",
+      "exitCode": 1,
+      "total": 85,
+      "passed": 67,
+      "failed": 18,
+      "failureTitles": [
+        "[R6] equal timestamp edit/delete conflicts must converge in either merge direction",
+        "[R6] differing settings at an equal revision must converge",
+        "[R5] rejects unsupported future backup versions",
+        "[R5] must not accept timestamps outside the JavaScript Date range",
+        "[R5] must not accept infinite updatedAt from a legal JSON exponent",
+        "[R5] malformed imported settings must not poison date calculations",
+        "[R4] a stalled fetch must settle or abort within a 15-minute safety budget",
+        "[R1] an aborted finish write must retain the recoverable timer",
+        "[R1] stop must leave a recoverable timer until the finished record is committed",
+        "[R1] switching subject must not expose the old timer and its finished record together",
+        "[R2] a stale second tab must not clear a newer timer from the first tab",
+        "[R3] a foreground reload must not overwrite a pause made during its DB read",
+        "[R3] a remote pull must not undo a newer delete made during bulkPut",
+        "[R5] importing a damaged newer record must not erase a valid saved duration",
+        "[R7] a settings-only import must schedule a new backup",
+        "[R4] a transient network failure must retry while the page stays open and online",
+        "[R8] disabling backup must prevent an in-flight read from starting a later upload",
+        "[R6] correcting the system clock must not resurrect a just-deleted record"
+      ]
+    },
+    {
+      "timezone": "America/New_York",
+      "exitCode": 1,
+      "total": 85,
+      "passed": 67,
+      "failed": 18,
+      "failureTitles": [
+        "[R6] equal timestamp edit/delete conflicts must converge in either merge direction",
+        "[R6] differing settings at an equal revision must converge",
+        "[R5] rejects unsupported future backup versions",
+        "[R5] must not accept timestamps outside the JavaScript Date range",
+        "[R5] must not accept infinite updatedAt from a legal JSON exponent",
+        "[R5] malformed imported settings must not poison date calculations",
+        "[R4] a stalled fetch must settle or abort within a 15-minute safety budget",
+        "[R1] an aborted finish write must retain the recoverable timer",
+        "[R1] stop must leave a recoverable timer until the finished record is committed",
+        "[R1] switching subject must not expose the old timer and its finished record together",
+        "[R2] a stale second tab must not clear a newer timer from the first tab",
+        "[R3] a foreground reload must not overwrite a pause made during its DB read",
+        "[R3] a remote pull must not undo a newer delete made during bulkPut",
+        "[R5] importing a damaged newer record must not erase a valid saved duration",
+        "[R7] a settings-only import must schedule a new backup",
+        "[R4] a transient network failure must retry while the page stays open and online",
+        "[R8] disabling backup must prevent an in-flight read from starting a later upload",
+        "[R6] correcting the system clock must not resurrect a just-deleted record"
+      ]
+    }
+  ],
+  "interleavingRepetitions": [
+    {
+      "run": 1,
+      "total": 19,
+      "passed": 8,
+      "failed": 11
+    },
+    {
+      "run": 2,
+      "total": 19,
+      "passed": 8,
+      "failed": 11
+    },
+    {
+      "run": 3,
+      "total": 19,
+      "passed": 8,
+      "failed": 11
+    },
+    {
+      "run": 4,
+      "total": 19,
+      "passed": 8,
+      "failed": 11
+    },
+    {
+      "run": 5,
+      "total": 19,
+      "passed": 8,
+      "failed": 11
+    }
+  ]
+}

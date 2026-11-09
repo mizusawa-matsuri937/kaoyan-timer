@@ -6,7 +6,12 @@ import { useApp } from '../store'
 /** 基础每日统计（只在记录变化时重算） */
 export function useBaseDaily(): Daily {
   const sessions = useApp((s) => s.sessions)
-  return useMemo(() => buildDaily(sessions), [sessions])
+  // 旧版本在换科目中途被打断时，可能同时留下计时器和同 id 的已完成记录；计时中只算一次
+  const activeId = useApp((s) => s.active?.sessionId ?? null)
+  return useMemo(
+    () => buildDaily(activeId ? sessions.filter((x) => x.id !== activeId) : sessions),
+    [sessions, activeId],
+  )
 }
 
 /** 叠加正在计时部分的每日统计（传入 now 实时刷新） */

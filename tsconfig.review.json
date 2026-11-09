@@ -1,0 +1,4 @@
+{
+  "extends": "./tsconfig.json",
+  "include": ["src", "review", "vite.config.ts", "vitest.review.config.ts"]
+}

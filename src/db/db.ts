@@ -6,10 +6,14 @@ export interface SyncMeta {
   /** 本地有尚未推送到 GitHub 的改动 */
   dirty: boolean
   lastError: string | null
+  /** 本地改动序号：每次本地数据改动 +1，同步完成时据此判断期间是否又有新改动（旧数据没有此字段，按 0 处理） */
+  seq?: number
 }
 
 export interface MetaMap {
   activeTimer: ActiveTimer | null
+  /** 计时状态修订号：任何标签页每做一次计时状态转换 +1（含开始/结束，计时器为 null 时也保留），用于识别过期操作 */
+  timerRev: number
   settings: Settings
   syncConfig: SyncConfig | null
   syncMeta: SyncMeta

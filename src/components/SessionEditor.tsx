@@ -55,7 +55,7 @@ export function SessionEditor({ target, onClose }: { target: EditorTarget; onClo
   const future = segments.some((g) => g.end > Date.now() + 60000)
   const total = invalid === -1 ? segmentsTotal(segments) : 0
 
-  const save = () => {
+  const save = async () => {
     if (!target) return
     if (invalid !== -1) return showToast(`第 ${invalid + 1} 段的结束时间必须晚于开始时间`, 'error')
     if (future) return showToast('不能记录未来的时间', 'error')
@@ -64,7 +64,11 @@ export function SessionEditor({ target, onClose }: { target: EditorTarget; onClo
       target.kind === 'edit'
         ? target.session
         : { id: uuid(), subjectId, segments: [], startAt: 0, source: 'manual', createdAt: now, updatedAt: now, deleted: false }
-    saveSession({ ...base, subjectId, segments })
+    const ok = await saveSession(
+      { ...base, subjectId, segments },
+      target.kind === 'edit' ? { expectedUpdatedAt: target.session.updatedAt } : {},
+    )
+    if (!ok) return // 失败/冲突的提示由 store 给出，面板保持打开
     showToast(target.kind === 'edit' ? '已修改' : '已补录', 'success')
     onClose()
   }
@@ -143,9 +147,10 @@ export function SessionEditor({ target, onClose }: { target: EditorTarget; onClo
         {target?.kind === 'edit' && (
           <Button
             variant="danger"
-            onClick={() => {
+            onClick={async () => {
               if (!confirmDel) return setConfirmDel(true)
-              deleteSession(target.session.id)
+              const ok = await deleteSession(target.session.id, { expectedUpdatedAt: target.session.updatedAt })
+              if (!ok) return
               showToast('已删除', 'success')
               onClose()
             }}
