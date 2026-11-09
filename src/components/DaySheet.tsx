@@ -4,9 +4,9 @@ import { formatClock, formatDayCN } from '../domain/dates'
 import { formatDuration, formatDurationCN } from '../domain/format'
 import { SUBJECTS, getSubject } from '../domain/subjects'
 import type { Session } from '../domain/types'
-import { HEAT_VARS } from './Heatmap'
+import { HEAT_GLOWS, HEAT_VARS } from './Heatmap'
 import { IconChevron, IconPlus } from './icons'
-import { Sheet } from './ui'
+import { GlowBar, Sheet } from './ui'
 
 export function DaySheet({
   day,
@@ -38,8 +38,8 @@ export function DaySheet({
     <Sheet open={!!day} onClose={onClose} title={day ? formatDayCN(day) : ''}>
       {day && (
         <>
-          <div className="flex items-center gap-3 rounded-2xl bg-card-2 p-4">
-            <span className="h-9 w-9 rounded-xl" style={{ background: HEAT_VARS[lvl] }} />
+          <div className="glass-flat flex items-center gap-3 rounded-2xl p-4">
+            <span className="h-9 w-9 rounded-xl" style={{ background: HEAT_VARS[lvl], boxShadow: HEAT_GLOWS[lvl] }} />
             <div>
               <div className="num text-2xl font-bold">{formatDurationCN(total)}</div>
               <div className="text-xs text-muted">等级：{LEVEL_LABELS[lvl]}</div>
@@ -54,9 +54,7 @@ export function DaySheet({
                     <span className="font-medium">{s.name}</span>
                     <span className="num text-muted">{formatDuration(ms)}</span>
                   </div>
-                  <div className="h-2 overflow-hidden rounded-full bg-card-2">
-                    <div className="h-full rounded-full" style={{ width: `${(ms / max) * 100}%`, background: s.color }} />
-                  </div>
+                  <GlowBar pct={(ms / max) * 100} color={s.color} />
                 </div>
               ))}
             </div>

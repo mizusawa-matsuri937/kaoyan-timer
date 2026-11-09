@@ -1,5 +1,6 @@
 import { motion } from 'framer-motion'
 import { lazy, Suspense, useEffect, useState } from 'react'
+import { AmbientGlow } from './components/AmbientGlow'
 import { ErrorBoundary } from './components/ErrorBoundary'
 import { OvertimeDialog } from './components/OvertimeDialog'
 import { TabBar, type TabId } from './components/TabBar'
@@ -58,7 +59,8 @@ export function App() {
   }
 
   return (
-    <div className="mx-auto min-h-full max-w-lg safe-top" style={{ paddingBottom: 'calc(env(safe-area-inset-bottom) + 72px)' }}>
+    <div className="mx-auto min-h-full max-w-lg safe-top" style={{ paddingBottom: 'calc(env(safe-area-inset-bottom) + 96px)' }}>
+      <AmbientGlow tab={tab} />
       <ErrorBoundary resetKey={tab}>
         <motion.main
             key={tab}

@@ -1,8 +1,8 @@
 import { useMemo, useState } from 'react'
 import { DaySheet } from '../components/DaySheet'
-import { HEAT_VARS, HeatLegend, Heatmap } from '../components/Heatmap'
+import { HEAT_GLOWS, HEAT_VARS, HeatLegend, Heatmap } from '../components/Heatmap'
 import { SessionEditor, type EditorTarget } from '../components/SessionEditor'
-import { SectionTitle } from '../components/ui'
+import { GlowStat, SectionTitle } from '../components/ui'
 import { LEVEL_LABELS, levelCounts, sessionsOnDay } from '../domain/aggregate'
 import { dayKey, diffDays } from '../domain/dates'
 import { formatDuration } from '../domain/format'
@@ -38,7 +38,7 @@ export function HeatmapPage() {
 
   return (
     <div className="px-4 pb-6">
-      <h1 className="pt-2 text-[28px] font-bold">学习热度</h1>
+      <h1 className="pt-2 text-[30px] font-bold tracking-tight">学习热度</h1>
 
       <div className="card mt-3 p-4">
         <Heatmap daily={daily} from={from} to={to} today={today} selected={selected} onSelect={setSelected} />
@@ -49,19 +49,9 @@ export function HeatmapPage() {
       </div>
 
       <div className="mt-3 grid grid-cols-3 gap-2.5">
-        {[
-          ['已备考', `${passedDays}`, '天'],
-          ['学习天数', `${studiedDays}`, '天'],
-          ['日均', formatDuration(totalMs / passedDays), ''],
-        ].map(([k, v, u]) => (
-          <div key={k} className="card px-3 py-3">
-            <div className="text-xs text-muted">{k}</div>
-            <div className="num mt-0.5 text-xl font-bold">
-              {v}
-              {u && <span className="ml-0.5 text-sm font-medium text-muted">{u}</span>}
-            </div>
-          </div>
-        ))}
+        <GlowStat compact label="已备考" value={passedDays} unit="天" color="#f59e0b" />
+        <GlowStat compact label="学习天数" value={studiedDays} unit="天" color="#22c55e" />
+        <GlowStat compact label="日均" value={formatDuration(totalMs / passedDays)} color="#6366f1" />
       </div>
 
       <SectionTitle>各等级天数</SectionTitle>
@@ -73,13 +63,17 @@ export function HeatmapPage() {
             <div key={lvl} className="flex items-center gap-3 py-3" style={{ borderColor: 'var(--line)' }}>
               <span
                 className="h-5 w-5 shrink-0 rounded-md"
-                style={{ background: HEAT_VARS[lvl], boxShadow: lvl === 0 ? 'inset 0 0 0 1px var(--line)' : undefined }}
+                style={{ background: HEAT_VARS[lvl], boxShadow: lvl === 0 ? 'inset 0 0 0 1px var(--line)' : HEAT_GLOWS[lvl] }}
               />
               <span className="w-20 text-[15px]">{LEVEL_LABELS[lvl]}</span>
               <div className="h-2 flex-1 overflow-hidden rounded-full bg-card-2">
                 <div
-                  className="h-full rounded-full transition-[width] duration-500"
-                  style={{ width: `${pct}%`, background: lvl === 0 ? 'var(--faint)' : HEAT_VARS[lvl] }}
+                  className="h-full rounded-full transition-[width] duration-700 ease-out"
+                  style={{
+                    width: `${pct}%`,
+                    background: lvl === 0 ? 'var(--faint)' : HEAT_VARS[lvl],
+                    boxShadow: HEAT_GLOWS[lvl],
+                  }}
                 />
               </div>
               <span className="num w-12 text-right text-[15px] font-semibold">

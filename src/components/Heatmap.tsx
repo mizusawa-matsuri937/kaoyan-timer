@@ -10,6 +10,7 @@ const LABEL_W = 18
 const TOP = 18
 
 export const HEAT_VARS = ['var(--h0)', 'var(--h1)', 'var(--h2)', 'var(--h3)', 'var(--h4)']
+export const HEAT_GLOWS = [undefined, undefined, undefined, '0 0 6px var(--h3-glow)', '0 0 10px var(--h4-glow)']
 
 interface Props {
   daily: Daily
@@ -80,6 +81,7 @@ export const Heatmap = memo(function Heatmap({ daily, from, to, today, selected,
             height: CELL,
             background: future ? 'transparent' : HEAT_VARS[lvl],
             border: future ? '1px dashed var(--line)' : undefined,
+            boxShadow: lvl === 4 && !future ? '0 0 8px var(--h4-glow)' : lvl === 3 && !future ? '0 0 5px var(--h3-glow)' : undefined,
             outline: isSel ? '2px solid var(--text)' : isToday ? '1.5px solid var(--accent)' : undefined,
             outlineOffset: 1,
             cursor: future ? 'default' : 'pointer',

@@ -1,46 +1,82 @@
 @import 'tailwindcss';
 
+/* ============ 设计令牌：亮色「晨曦磨砂玻璃」 ============ */
 :root {
-  --bg: #f4f5f7;
-  --card: #ffffff;
-  --card-2: #f0f2f5;
-  --text: #0f172a;
-  --muted: #6b7280;
-  --faint: #9ca3af;
+  --bg: #f1f4f9;
+  --text: #0b1220;
+  --muted: #5f6b7d;
+  --faint: #98a2b3;
   --line: rgba(15, 23, 42, 0.07);
+
+  /* 玻璃卡片 */
+  --card: rgba(255, 255, 255, 0.7);
+  --card-strong: rgba(255, 255, 255, 0.82);
+  --card-2: rgba(15, 23, 42, 0.045);
+  --card-border: rgba(255, 255, 255, 0.85);
+  --card-highlight: rgba(255, 255, 255, 1);
+  --shadow: 0 1px 2px rgba(15, 23, 42, 0.04), 0 10px 30px -8px rgba(30, 41, 59, 0.12);
+  --shadow-float: 0 18px 50px -12px rgba(30, 41, 59, 0.28), 0 4px 14px rgba(30, 41, 59, 0.08);
+  --sheet-bg: rgba(250, 251, 253, 0.86);
+  --seg-pill: rgba(255, 255, 255, 0.95);
+  --ring-track: rgba(15, 23, 42, 0.06);
+  --ring-track-edge: rgba(255, 255, 255, 0.9);
+
   --accent: #16a34a;
+  --accent-2: #6366f1;
   --accent-soft: rgba(22, 163, 74, 0.12);
   --danger: #dc2626;
-  --shadow: 0 1px 2px rgba(15, 23, 42, 0.04), 0 8px 24px rgba(15, 23, 42, 0.06);
-  --backdrop: rgba(15, 23, 42, 0.35);
+  --backdrop: rgba(15, 23, 42, 0.28);
+
+  /* 环境光 */
+  --ambient-opacity: 0.5;
+
   /* GitHub contributions 配色 */
-  --h0: #ebedf0;
+  --h0: rgba(15, 23, 42, 0.07);
   --h1: #9be9a8;
   --h2: #40c463;
   --h3: #30a14e;
   --h4: #216e39;
+  --h3-glow: rgba(48, 161, 78, 0.35);
+  --h4-glow: rgba(33, 110, 57, 0.45);
   color-scheme: light;
 }
 
+/* ============ 暗色「深邃黑曜石」 ============ */
 @media (prefers-color-scheme: dark) {
   :root {
-    --bg: #0b0d10;
-    --card: #15181d;
-    --card-2: #1d2128;
-    --text: #e8eaed;
-    --muted: #9aa3ad;
-    --faint: #6b7380;
+    --bg: #07090e;
+    --text: #eef1f6;
+    --muted: #97a1b2;
+    --faint: #5f6878;
     --line: rgba(255, 255, 255, 0.07);
+
+    --card: rgba(22, 26, 35, 0.55);
+    --card-strong: rgba(26, 30, 40, 0.78);
+    --card-2: rgba(255, 255, 255, 0.055);
+    --card-border: rgba(255, 255, 255, 0.07);
+    --card-highlight: rgba(255, 255, 255, 0.08);
+    --shadow: 0 1px 2px rgba(0, 0, 0, 0.4), 0 12px 32px -10px rgba(0, 0, 0, 0.6);
+    --shadow-float: 0 20px 50px -12px rgba(0, 0, 0, 0.75), 0 0 0 1px rgba(255, 255, 255, 0.04);
+    --sheet-bg: rgba(16, 19, 26, 0.88);
+    --seg-pill: rgba(255, 255, 255, 0.1);
+    --ring-track: rgba(255, 255, 255, 0.06);
+    --ring-track-edge: rgba(255, 255, 255, 0.05);
+
     --accent: #3fb950;
+    --accent-2: #818cf8;
     --accent-soft: rgba(63, 185, 80, 0.16);
     --danger: #f85149;
-    --shadow: 0 1px 2px rgba(0, 0, 0, 0.3), 0 8px 24px rgba(0, 0, 0, 0.25);
     --backdrop: rgba(0, 0, 0, 0.55);
-    --h0: #1f242c;
+
+    --ambient-opacity: 0.5;
+
+    --h0: rgba(255, 255, 255, 0.06);
     --h1: #0e4429;
     --h2: #006d32;
     --h3: #26a641;
     --h4: #39d353;
+    --h3-glow: rgba(38, 166, 65, 0.45);
+    --h4-glow: rgba(57, 211, 83, 0.55);
     color-scheme: dark;
   }
 }
@@ -56,7 +92,7 @@
   --color-accent: var(--accent);
   --color-accent-soft: var(--accent-soft);
   --color-danger: var(--danger);
-  --font-sans: -apple-system, BlinkMacSystemFont, 'SF Pro Text', 'PingFang SC', 'Hiragino Sans GB',
+  --font-sans: -apple-system, BlinkMacSystemFont, 'SF Pro Text', 'Inter', 'PingFang SC', 'Hiragino Sans GB',
     'Microsoft YaHei', system-ui, sans-serif;
 }
 
@@ -91,29 +127,49 @@ textarea {
   color: inherit;
 }
 
+/* 数字：几何感字体 + 等宽数字，计时跳动不位移（不加载外部字体，离线可用） */
 .num {
+  font-family: 'SF Pro Rounded', ui-rounded, 'Plus Jakarta Sans', 'Inter', 'SF Pro Display', 'DIN Alternate',
+    -apple-system, system-ui, sans-serif;
   font-variant-numeric: tabular-nums;
   font-feature-settings: 'tnum';
 }
 
+/* 组件类放进 components 层，Tailwind 工具类（fixed、p-4 等）可以覆盖它们 */
+@layer components {
+/* ============ 流光毛玻璃卡片 ============ */
 .card {
+  position: relative;
   background: var(--card);
+  border: 1px solid var(--card-border);
   border-radius: 1.5rem;
-  box-shadow: var(--shadow);
+  box-shadow: var(--shadow), inset 0 1px 0 var(--card-highlight);
+  -webkit-backdrop-filter: blur(20px) saturate(160%);
+  backdrop-filter: blur(20px) saturate(160%);
+}
+
+/* 不需要模糊的内层玻璃（叠在 .card 里面时用，减少 GPU 开销） */
+.glass-flat {
+  background: var(--card-2);
+  border: 1px solid var(--line);
 }
 
 .field {
   width: 100%;
   background: var(--card-2);
-  border: 1px solid transparent;
+  border: 1px solid var(--line);
   border-radius: 0.875rem;
   padding: 0.7rem 0.9rem;
   outline: none;
   font-size: 16px; /* 防止 iOS 聚焦时自动放大 */
-  transition: border-color 0.15s;
+  transition:
+    border-color 0.15s,
+    box-shadow 0.15s;
 }
 .field:focus {
   border-color: var(--accent);
+  box-shadow: 0 0 0 3px var(--accent-soft);
+}
 }
 
 .no-scrollbar::-webkit-scrollbar {
@@ -130,6 +186,7 @@ textarea {
   padding-bottom: env(safe-area-inset-bottom);
 }
 
+/* ============ 动画 ============ */
 @keyframes pulse-dot {
   0%,
   100% {
@@ -143,4 +200,64 @@ textarea {
 }
 .pulse-dot {
   animation: pulse-dot 1.6s ease-in-out infinite;
+}
+
+/* 环境光呼吸：只动 transform / opacity，交给合成层，不卡顿 */
+@keyframes ambient-breathe {
+  0%,
+  100% {
+    transform: translate3d(0, 0, 0) scale(1);
+    opacity: 1;
+  }
+  50% {
+    transform: translate3d(0, -2%, 0) scale(1.12);
+    opacity: 0.72;
+  }
+}
+.ambient-breathe {
+  animation: ambient-breathe 7s ease-in-out infinite;
+}
+
+@keyframes ambient-drift {
+  0%,
+  100% {
+    transform: translate3d(0, 0, 0) scale(1);
+  }
+  50% {
+    transform: translate3d(4%, 3%, 0) scale(1.06);
+  }
+}
+.ambient-drift {
+  animation: ambient-drift 18s ease-in-out infinite;
+}
+
+/* 发光脉冲：颜色由 --glow 提供 */
+@keyframes glow-pulse {
+  0%,
+  100% {
+    box-shadow:
+      var(--shadow),
+      inset 0 1px 0 var(--card-highlight),
+      0 0 0 1px var(--glow),
+      0 6px 22px -6px var(--glow);
+  }
+  50% {
+    box-shadow:
+      var(--shadow),
+      inset 0 1px 0 var(--card-highlight),
+      0 0 0 1px var(--glow),
+      0 10px 34px -4px var(--glow);
+  }
+}
+.glow-pulse {
+  animation: glow-pulse 2.4s ease-in-out infinite;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .ambient-breathe,
+  .ambient-drift,
+  .glow-pulse,
+  .pulse-dot {
+    animation: none;
+  }
 }
