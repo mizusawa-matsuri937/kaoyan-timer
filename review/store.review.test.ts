@@ -1,3 +1,4 @@
+import { testLocks } from './fixtures'
 import 'fake-indexeddb/auto'
 import Dexie from 'dexie'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
@@ -31,7 +32,7 @@ async function newTab() {
 beforeEach(async () => {
   vi.useFakeTimers({ toFake: ['Date', 'setTimeout', 'clearTimeout'] })
   vi.setSystemTime(NOW)
-  vi.stubGlobal('navigator', { onLine: true })
+  vi.stubGlobal('navigator', { onLine: true, locks: testLocks })
   vi.stubGlobal('fetch', vi.fn(() => { throw new Error('Real network is forbidden in audit tests') }))
   vi.spyOn(console, 'error').mockImplementation(() => {})
   get.mockReset().mockResolvedValue(null)
@@ -114,13 +115,13 @@ describe('store persistence and recovery with real Dexie + fake IndexedDB', () =
   })
 
   it('stores offline edits and syncs them after connectivity is restored', async () => {
-    vi.stubGlobal('navigator', { onLine: false })
+    vi.stubGlobal('navigator', { onLine: false, locks: testLocks })
     await store.setSyncConfig(config)
     store.saveSession(session())
     await store.reloadFromDb()
     expect(store.getState().sync.status).toBe('offline')
     expect(get).not.toHaveBeenCalled()
-    vi.stubGlobal('navigator', { onLine: true })
+    vi.stubGlobal('navigator', { onLine: true, locks: testLocks })
     await store.syncNow()
     expect(put).toHaveBeenCalledTimes(1)
     expect(parseBackup(put.mock.calls[0][1]).sessions).toHaveLength(1)
@@ -329,10 +330,17 @@ describe('regression contracts: interrupted writes and interleavings', () => {
 
   it('[R4] a transient network failure must retry while the page stays open and online', async () => {
     await store.setSyncConfig(config)
-    get.mockClear().mockRejectedValueOnce(new TypeError('temporary network failure')).mockResolvedValue(null)
+    const retried = deferred<void>()
+    get.mockClear().mockRejectedValueOnce(new TypeError('temporary network failure')).mockImplementation(() => {
+      retried.resolve()
+      return Promise.resolve(null)
+    })
     await store.syncNow()
     expect(store.getState().sync.status).toBe('error')
-    await vi.advanceTimersByTimeAsync(HOUR)
+    // Retry begins within 5–6 seconds. Let real locks/IDB run before advancing their timeouts.
+    await vi.advanceTimersByTimeAsync(6001)
+    await retried.promise
+    await store.syncNow({ throttle: true }) // join the retry; do not initiate an extra request
     expect(get.mock.calls.length).toBeGreaterThan(1)
   })
 

@@ -1,0 +1,251 @@
+{
+  "commit": "88b7396693df1321d5eecfa8b0f2b896e74569c5",
+  "baseline": "d22d65e",
+  "reviewDate": "2026-11-09",
+  "unchangedExistingReviewTests": 136,
+  "addedTests": 26,
+  "confirmedFindingGroups": 8,
+  "runs": [
+    {
+      "timezone": "host default",
+      "command": "npm run test:review -- --reporter=json --outputFile=/tmp/kaoyan-88-codex-default.json",
+      "exitCode": 1,
+      "total": 162,
+      "passed": 150,
+      "failed": 12,
+      "skipped": 0,
+      "failures": [
+        {
+          "file": "review/codex.components-review.test.ts",
+          "title": "[C7] clicking manual-save twice before the first save finishes must create only one record",
+          "failure": "AssertionError: expected { count: 2, total: 7200000 } to deeply equal { count: 1, total: 3600000 }"
+        },
+        {
+          "file": "review/codex.components-review.test.ts",
+          "title": "[C8] a failed overtime settlement must keep the correction dialog open for retry",
+          "failure": "AssertionError: expected false to be true // Object.is equality"
+        },
+        {
+          "file": "review/codex.store-review.test.ts",
+          "title": "[C1] an editor opened before a same-revision remote change must not overwrite it",
+          "failure": "AssertionError: expected { accepted: true, subject: 'la' } to deeply equal { accepted: false, subject: 'os' }"
+        },
+        {
+          "file": "review/codex.store-review.test.ts",
+          "title": "[C1] an editor opened before a same-revision remote tombstone must not resurrect it",
+          "failure": "AssertionError: expected { accepted: true, deleted: false } to deeply equal { accepted: false, deleted: true }"
+        },
+        {
+          "file": "review/codex.store-review.test.ts",
+          "title": "[C2] rejecting a stale timer action must refresh the finished session as well as activeTimer",
+          "failure": "AssertionError: expected [] to deeply equal [ { …(8) } ]"
+        },
+        {
+          "file": "review/codex.store-review.test.ts",
+          "title": "[C3] closing backup in another tab after merge commit must stop the later PUT",
+          "failure": "AssertionError: expected \"vi.fn()\" to not be called at all, but actually been called 1 times"
+        },
+        {
+          "file": "review/codex.store-review.test.ts",
+          "title": "[C4] a failed configuration write must not leave a cancelled sync displayed as running",
+          "failure": "AssertionError: expected 'syncing' not to be 'syncing' // Object.is equality"
+        },
+        {
+          "file": "review/codex.store-review.test.ts",
+          "title": "[C5] accepting the maximum revision must not produce an unimportable backup after delete",
+          "failure": "AssertionError: expected [ { index: +0, …(1) } ] to deeply equal []"
+        },
+        {
+          "file": "review/codex.store-review.test.ts",
+          "title": "[C5] settings accepted at the maximum revision must remain editable",
+          "failure": "AssertionError: expected false to be true // Object.is equality"
+        },
+        {
+          "file": "review/codex.store-review.test.ts",
+          "title": "[C4] adopting another tab configuration must not retain the cancelled task syncing status",
+          "failure": "AssertionError: expected 'syncing' not to be 'syncing' // Object.is equality"
+        },
+        {
+          "file": "review/codex.store-review.test.ts",
+          "title": "[C4] a quota failure while recording a sync error must still publish a recoverable error status",
+          "failure": "AssertionError: expected 'syncing' to be 'error' // Object.is equality"
+        },
+        {
+          "file": "review/codex.store-review.test.ts",
+          "title": "[C6] a failed settings write and failed rollback read must not leave optimistic settings exportable",
+          "failure": "AssertionError: expected { examDate: '2027-12-20', …(4) } to deeply equal { examDate: '2027-12-25', …(4) }"
+        }
+      ]
+    },
+    {
+      "timezone": "Asia/Shanghai",
+      "command": "TZ=Asia/Shanghai npm run test:review -- --reporter=json --outputFile=/tmp/kaoyan-88-codex-shanghai.json",
+      "exitCode": 1,
+      "total": 162,
+      "passed": 150,
+      "failed": 12,
+      "skipped": 0,
+      "failures": [
+        {
+          "file": "review/codex.components-review.test.ts",
+          "title": "[C7] clicking manual-save twice before the first save finishes must create only one record",
+          "failure": "AssertionError: expected { count: 2, total: 7200000 } to deeply equal { count: 1, total: 3600000 }"
+        },
+        {
+          "file": "review/codex.components-review.test.ts",
+          "title": "[C8] a failed overtime settlement must keep the correction dialog open for retry",
+          "failure": "AssertionError: expected false to be true // Object.is equality"
+        },
+        {
+          "file": "review/codex.store-review.test.ts",
+          "title": "[C1] an editor opened before a same-revision remote change must not overwrite it",
+          "failure": "AssertionError: expected { accepted: true, subject: 'la' } to deeply equal { accepted: false, subject: 'os' }"
+        },
+        {
+          "file": "review/codex.store-review.test.ts",
+          "title": "[C1] an editor opened before a same-revision remote tombstone must not resurrect it",
+          "failure": "AssertionError: expected { accepted: true, deleted: false } to deeply equal { accepted: false, deleted: true }"
+        },
+        {
+          "file": "review/codex.store-review.test.ts",
+          "title": "[C2] rejecting a stale timer action must refresh the finished session as well as activeTimer",
+          "failure": "AssertionError: expected [] to deeply equal [ { …(8) } ]"
+        },
+        {
+          "file": "review/codex.store-review.test.ts",
+          "title": "[C3] closing backup in another tab after merge commit must stop the later PUT",
+          "failure": "AssertionError: expected \"vi.fn()\" to not be called at all, but actually been called 1 times"
+        },
+        {
+          "file": "review/codex.store-review.test.ts",
+          "title": "[C4] a failed configuration write must not leave a cancelled sync displayed as running",
+          "failure": "AssertionError: expected 'syncing' not to be 'syncing' // Object.is equality"
+        },
+        {
+          "file": "review/codex.store-review.test.ts",
+          "title": "[C5] accepting the maximum revision must not produce an unimportable backup after delete",
+          "failure": "AssertionError: expected [ { index: +0, …(1) } ] to deeply equal []"
+        },
+        {
+          "file": "review/codex.store-review.test.ts",
+          "title": "[C5] settings accepted at the maximum revision must remain editable",
+          "failure": "AssertionError: expected false to be true // Object.is equality"
+        },
+        {
+          "file": "review/codex.store-review.test.ts",
+          "title": "[C4] adopting another tab configuration must not retain the cancelled task syncing status",
+          "failure": "AssertionError: expected 'syncing' not to be 'syncing' // Object.is equality"
+        },
+        {
+          "file": "review/codex.store-review.test.ts",
+          "title": "[C4] a quota failure while recording a sync error must still publish a recoverable error status",
+          "failure": "AssertionError: expected 'syncing' to be 'error' // Object.is equality"
+        },
+        {
+          "file": "review/codex.store-review.test.ts",
+          "title": "[C6] a failed settings write and failed rollback read must not leave optimistic settings exportable",
+          "failure": "AssertionError: expected { examDate: '2027-12-20', …(4) } to deeply equal { examDate: '2027-12-25', …(4) }"
+        }
+      ]
+    },
+    {
+      "timezone": "America/New_York",
+      "command": "TZ=America/New_York npm run test:review -- --reporter=json --outputFile=/tmp/kaoyan-88-codex-newyork.json",
+      "exitCode": 1,
+      "total": 162,
+      "passed": 150,
+      "failed": 12,
+      "skipped": 0,
+      "failures": [
+        {
+          "file": "review/codex.components-review.test.ts",
+          "title": "[C7] clicking manual-save twice before the first save finishes must create only one record",
+          "failure": "AssertionError: expected { count: 2, total: 7200000 } to deeply equal { count: 1, total: 3600000 }"
+        },
+        {
+          "file": "review/codex.components-review.test.ts",
+          "title": "[C8] a failed overtime settlement must keep the correction dialog open for retry",
+          "failure": "AssertionError: expected false to be true // Object.is equality"
+        },
+        {
+          "file": "review/codex.store-review.test.ts",
+          "title": "[C1] an editor opened before a same-revision remote change must not overwrite it",
+          "failure": "AssertionError: expected { accepted: true, subject: 'la' } to deeply equal { accepted: false, subject: 'os' }"
+        },
+        {
+          "file": "review/codex.store-review.test.ts",
+          "title": "[C1] an editor opened before a same-revision remote tombstone must not resurrect it",
+          "failure": "AssertionError: expected { accepted: true, deleted: false } to deeply equal { accepted: false, deleted: true }"
+        },
+        {
+          "file": "review/codex.store-review.test.ts",
+          "title": "[C2] rejecting a stale timer action must refresh the finished session as well as activeTimer",
+          "failure": "AssertionError: expected [] to deeply equal [ { …(8) } ]"
+        },
+        {
+          "file": "review/codex.store-review.test.ts",
+          "title": "[C3] closing backup in another tab after merge commit must stop the later PUT",
+          "failure": "AssertionError: expected \"vi.fn()\" to not be called at all, but actually been called 1 times"
+        },
+        {
+          "file": "review/codex.store-review.test.ts",
+          "title": "[C4] a failed configuration write must not leave a cancelled sync displayed as running",
+          "failure": "AssertionError: expected 'syncing' not to be 'syncing' // Object.is equality"
+        },
+        {
+          "file": "review/codex.store-review.test.ts",
+          "title": "[C5] accepting the maximum revision must not produce an unimportable backup after delete",
+          "failure": "AssertionError: expected [ { index: +0, …(1) } ] to deeply equal []"
+        },
+        {
+          "file": "review/codex.store-review.test.ts",
+          "title": "[C5] settings accepted at the maximum revision must remain editable",
+          "failure": "AssertionError: expected false to be true // Object.is equality"
+        },
+        {
+          "file": "review/codex.store-review.test.ts",
+          "title": "[C4] adopting another tab configuration must not retain the cancelled task syncing status",
+          "failure": "AssertionError: expected 'syncing' not to be 'syncing' // Object.is equality"
+        },
+        {
+          "file": "review/codex.store-review.test.ts",
+          "title": "[C4] a quota failure while recording a sync error must still publish a recoverable error status",
+          "failure": "AssertionError: expected 'syncing' to be 'error' // Object.is equality"
+        },
+        {
+          "file": "review/codex.store-review.test.ts",
+          "title": "[C6] a failed settings write and failed rollback read must not leave optimistic settings exportable",
+          "failure": "AssertionError: expected { examDate: '2027-12-20', …(4) } to deeply equal { examDate: '2027-12-25', …(4) }"
+        }
+      ]
+    }
+  ],
+  "repeatRuns": [
+    {
+      "run": 1,
+      "total": 26,
+      "passed": 14,
+      "failed": 12,
+      "exitCode": 1
+    },
+    {
+      "run": 2,
+      "total": 26,
+      "passed": 14,
+      "failed": 12,
+      "exitCode": 1
+    },
+    {
+      "run": 3,
+      "total": 26,
+      "passed": 14,
+      "failed": 12,
+      "exitCode": 1
+    }
+  ],
+  "businessCodeChanged": false,
+  "existingTestsChanged": false,
+  "network": "mocked; no GitHub access",
+  "database": "isolated fake-indexeddb; no user data",
+  "componentTests": "mocked React hook scheduling, actual event handlers and store; not browser integration"
+}

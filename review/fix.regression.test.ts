@@ -1,3 +1,4 @@
+import { testLocks } from './fixtures'
 import 'fake-indexeddb/auto'
 import Dexie from 'dexie'
 import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest'
@@ -62,7 +63,7 @@ beforeEach(async () => {
   unhandled.length = 0
   vi.useFakeTimers({ toFake: ['Date', 'setTimeout', 'clearTimeout'] })
   vi.setSystemTime(NOW)
-  vi.stubGlobal('navigator', { onLine: true })
+  vi.stubGlobal('navigator', { onLine: true, locks: testLocks })
   vi.stubGlobal('fetch', vi.fn(() => { throw new Error('Real network is forbidden in tests') }))
   vi.spyOn(console, 'error').mockImplementation(() => {})
   get.mockReset().mockResolvedValue(null)
@@ -213,9 +214,9 @@ describe('R2 stale tabs and concurrent windows', () => {
     const second = await newTab()
     const opened = second.store.getState().sessions.find((s) => s.id === 'x')!
     vi.setSystemTime(NOW + MIN)
-    expect(await store.saveSession({ ...opened, subjectId: 'os' }, { expectedUpdatedAt: opened.updatedAt })).toBe(true)
-    expect(await second.store.saveSession({ ...opened, subjectId: 'la' }, { expectedUpdatedAt: opened.updatedAt })).toBe(false)
-    expect(await second.store.deleteSession('x', { expectedUpdatedAt: opened.updatedAt })).toBe(false)
+    expect(await store.saveSession({ ...opened, subjectId: 'os' }, { expectedSession: opened })).toBe(true)
+    expect(await second.store.saveSession({ ...opened, subjectId: 'la' }, { expectedSession: opened })).toBe(false)
+    expect(await second.store.deleteSession('x', { expectedSession: opened })).toBe(false)
     const row = (await database.db.sessions.get('x'))!
     expect(row.subjectId).toBe('os')
     expect(row.deleted).toBe(false)
@@ -285,7 +286,7 @@ describe('R3 asynchronous ordering', () => {
     await started.promise
     vi.setSystemTime(NOW + MIN)
     const original = (await database.db.sessions.get('x'))!
-    expect(await store.saveSession({ ...original, subjectId: 'os' }, { expectedUpdatedAt: original.updatedAt })).toBe(true)
+    expect(await store.saveSession({ ...original, subjectId: 'os' }, { expectedSession: original })).toBe(true)
     read.resolve(remote([session('x')])) // 远端还是旧版本
     await syncing
     await store.reloadFromDb()
@@ -484,7 +485,7 @@ describe('R6 revisions, clock correction and convergence', () => {
     await store.setSyncConfig(config)
     const synced = (await database.db.sessions.get('x'))!
     vi.setSystemTime(NOW) // 时钟被往回校正 1 小时
-    expect(await store.saveSession({ ...synced, subjectId: 'os' }, { expectedUpdatedAt: synced.updatedAt })).toBe(true)
+    expect(await store.saveSession({ ...synced, subjectId: 'os' }, { expectedSession: synced })).toBe(true)
     const edited = (await database.db.sessions.get('x'))!
     expect(edited.updatedAt).toBeGreaterThan(synced.updatedAt)
     get.mockResolvedValue(remote([synced]))

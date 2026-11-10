@@ -16,6 +16,8 @@ export interface MetaMap {
   timerRev: number
   settings: Settings
   syncConfig: SyncConfig | null
+  /** Local configuration generation; also detects disable/re-enable with identical credentials. */
+  syncConfigRev: number
   syncMeta: SyncMeta
 }
 

@@ -1,3 +1,4 @@
+import { locks } from 'node:worker_threads'
 import type { Session, Settings, SyncConfig } from '../src/domain/types'
 
 export const NOW = Date.parse('2026-11-09T08:00:00Z')
@@ -28,3 +29,6 @@ export function deferred<T>() {
   const promise = new Promise<T>((yes, no) => { resolve = yes; reject = no })
   return { promise, resolve, reject }
 }
+
+// Node's native Web Locks implementation; shared across the simulated tabs in a test.
+export const testLocks = locks as unknown as LockManager

@@ -1,4 +1,4 @@
-import { dayKey, parseDay } from '../domain/dates'
+import { dayKey, parseDay, diffDays } from '../domain/dates'
 import { getSubject } from '../domain/subjects'
 import type { Segment, Session, Settings } from '../domain/types'
 
@@ -7,6 +7,9 @@ export const BACKUP_VERSION = 1
 /** 合法时间戳范围：1970-01-01 ~ 2100-01-01（拒绝负数、无穷大、远未来值） */
 export const MIN_TIMESTAMP = 0
 export const MAX_TIMESTAMP = Date.UTC(2100, 0, 1)
+
+/** updatedAt is a logical revision, not a calendar date. */
+export const MAX_REVISION = Number.MAX_SAFE_INTEGER
 
 /** 备份文件格式（不包含 Token） */
 export interface BackupFile {
@@ -43,13 +46,20 @@ export interface MergeResult {
  */
 export function nextRevision(previous: number | null | undefined, now = Date.now()): number {
   const prev = Number.isFinite(previous) ? (previous as number) : 0
-  return Math.max(Math.floor(now), Math.floor(prev) + 1)
+  const next = Math.max(Math.floor(now), Math.floor(prev) + 1)
+  if (!Number.isSafeInteger(next) || next > MAX_REVISION) {
+    throw new Error('记录修订号已达到安全数值上限，无法保存；请先导出备份')
+  }
+  return next
 }
 
 // ---------- 校验 ----------
 
 const isTs = (v: unknown): v is number =>
   typeof v === 'number' && Number.isFinite(v) && v >= MIN_TIMESTAMP && v <= MAX_TIMESTAMP
+
+const isRevision = (v: unknown): v is number =>
+  typeof v === 'number' && Number.isSafeInteger(v) && v >= 0 && v <= MAX_REVISION
 
 export function isValidDay(v: unknown): v is string {
   return typeof v === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(v) && dayKey(parseDay(v)) === v
@@ -77,7 +87,7 @@ export function checkSession(raw: unknown): Checked<Session> {
   if (!x || typeof x !== 'object') return { ok: false, reason: '不是对象' }
   if (typeof x.id !== 'string' || x.id.length === 0 || x.id.length > 200) return { ok: false, reason: 'id 无效' }
   if (typeof x.subjectId !== 'string' || !getSubject(x.subjectId)) return { ok: false, reason: '未知科目' }
-  if (!isTs(x.updatedAt)) return { ok: false, reason: 'updatedAt 无效' }
+  if (!isRevision(x.updatedAt)) return { ok: false, reason: 'updatedAt 无效' }
   if (x.deleted !== undefined && typeof x.deleted !== 'boolean') return { ok: false, reason: 'deleted 无效' }
   if (x.source !== undefined && x.source !== 'timer' && x.source !== 'manual') return { ok: false, reason: 'source 无效' }
   if (x.createdAt !== undefined && !isTs(x.createdAt)) return { ok: false, reason: 'createdAt 无效' }
@@ -99,28 +109,46 @@ export function checkSession(raw: unknown): Checked<Session> {
       segments,
       startAt,
       source: x.source === 'manual' ? 'manual' : 'timer',
-      createdAt: x.createdAt ?? x.updatedAt,
+      createdAt: x.createdAt ?? (isTs(x.updatedAt) ? x.updatedAt : startAt),
       updatedAt: x.updatedAt,
       deleted,
     },
   }
 }
 
-export function checkSettings(raw: unknown): Checked<Settings> {
+export function checkSettings(raw: unknown, strictDates = false): Checked<Settings> {
   const x = raw as Partial<Settings> | null
   if (!x || typeof x !== 'object') return { ok: false, reason: '设置不是对象' }
   if (!isValidDay(x.examDate)) return { ok: false, reason: '初试日期无效' }
   if (!isValidDay(x.startDate)) return { ok: false, reason: '备考开始日期无效' }
+  let examDate = x.examDate, startDate = x.startDate
+  const safeDates = startDate >= '2000-01-01' && examDate <= '2100-01-01' &&
+    startDate <= examDate && diffDays(startDate, examDate) <= 3660
+  if (!safeDates) {
+    if (strictDates) return { ok: false, reason: '日期须在 2000—2100 年内，开始不晚于初试，跨度不超过 10 年' }
+    // Legacy backups remain readable. Deterministic fallback, preserving revision and all sessions.
+    // updatedAt 是逻辑修订号：只有落在真实日期范围内才当作时间用（0 表示从未修改过的默认设置）。
+    // 否则从日期本身取年份，避免回退到离现在很远、之后无法单独改回来的年份。
+    const inRange = (d: string) => d >= '2000-01-01' && d <= '2100-01-01'
+    const base = isTs(x.updatedAt) && x.updatedAt >= Date.UTC(2000, 0, 1)
+      ? new Date(x.updatedAt).getUTCFullYear()
+      : inRange(startDate) ? Number(startDate.slice(0, 4))
+        : inRange(examDate) ? Number(examDate.slice(0, 4)) - 1
+          : 2026
+    const year = Math.min(2098, Math.max(2000, base))
+    startDate = `${year}-01-01`
+    examDate = `${year + 1}-12-25`
+  }
   if (typeof x.overtimeHours !== 'number' || !Number.isFinite(x.overtimeHours) || x.overtimeHours < 0.5 || x.overtimeHours > 24) {
     return { ok: false, reason: '超时提醒时长无效' }
   }
   if (x.keepAwake !== undefined && typeof x.keepAwake !== 'boolean') return { ok: false, reason: '屏幕常亮设置无效' }
-  if (!isTs(x.updatedAt)) return { ok: false, reason: '设置的 updatedAt 无效' }
+  if (!isRevision(x.updatedAt)) return { ok: false, reason: '设置的 updatedAt 无效' }
   return {
     ok: true,
     value: {
-      examDate: x.examDate,
-      startDate: x.startDate,
+      examDate,
+      startDate,
       overtimeHours: x.overtimeHours,
       keepAwake: x.keepAwake === true,
       updatedAt: x.updatedAt,
@@ -188,7 +216,7 @@ export function makeBackup(sessions: Session[], settings: Settings | null, now: 
 
 // ---------- 合并（确定性、可交换） ----------
 
-function canonicalSession(s: Session): string {
+export function sessionFingerprint(s: Session): string {
   return JSON.stringify([s.id, s.subjectId, s.segments.map((g) => [g.start, g.end]), s.startAt, s.source, s.createdAt, s.updatedAt, !!s.deleted])
 }
 
@@ -205,8 +233,11 @@ function canonicalSettings(s: Settings): string {
 export function compareSessions(a: Session, b: Session): number {
   if (a.updatedAt !== b.updatedAt) return a.updatedAt > b.updatedAt ? 1 : -1
   if (!!a.deleted !== !!b.deleted) return a.deleted ? 1 : -1
-  const ka = canonicalSession(a)
-  const kb = canonicalSession(b)
+  if (a.id === b.id && a.subjectId === b.subjectId && a.startAt === b.startAt &&
+      a.source === b.source && a.createdAt === b.createdAt && a.segments.length === b.segments.length &&
+      a.segments.every((g, i) => g.start === b.segments[i].start && g.end === b.segments[i].end)) return 0
+  const ka = sessionFingerprint(a)
+  const kb = sessionFingerprint(b)
   return ka === kb ? 0 : ka > kb ? 1 : -1
 }
 
@@ -251,6 +282,8 @@ export function mergeSessions(local: Session[], remote: Session[]): MergeResult 
 
 /** 设置合并：版本大的胜出，相同版本按内容决胜；返回值与本地相同则原样返回本地对象 */
 export function mergeSettings(local: Settings, remote: Settings | null): Settings {
+  const checked = checkSettings(local)
+  if (checked.ok && compareSettings(checked.value, local) !== 0) local = checked.value
   if (!remote) return local
   const c = compareSettings(remote, local)
   if (c > 0) return { ...local, ...remote }

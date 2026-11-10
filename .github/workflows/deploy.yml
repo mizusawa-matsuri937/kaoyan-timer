@@ -25,9 +25,13 @@ jobs:
           cache: npm
       - run: npm ci
       # 测试不通过就不发布，坏版本不会上线
-      - run: npm test
+      - run: npx tsc -p tsconfig.review.json --noEmit
+      - run: npm run test:review
         env:
           TZ: Asia/Shanghai
+      - run: npm run test:review
+        env:
+          TZ: America/New_York
       - run: npm run build
         env:
           BASE_PATH: /${{ github.event.repository.name }}/

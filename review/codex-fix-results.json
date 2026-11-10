@@ -1,0 +1,199 @@
+{
+  "date": "2026-11-10",
+  "baseCommit": "88b7396693df1321d5eecfa8b0f2b896e74569c5",
+  "target": "uncommitted working tree",
+  "findingGroupsAddressed": [
+    "C1",
+    "C2",
+    "C3",
+    "C4",
+    "C5",
+    "C6",
+    "C7",
+    "C8"
+  ],
+  "originalReproductions": "all 12 previously failing assertions pass after API/harness adaptation; expectations retained",
+  "additionalAcceptanceTests": 20,
+  "runs": [
+    {
+      "timezone": "host default",
+      "command": "npm run test:review -- --reporter=json --outputFile=/tmp/kaoyan-fix-final-default.json",
+      "exitCode": 0,
+      "total": 182,
+      "passed": 182,
+      "failed": 0,
+      "skipped": 0,
+      "files": [
+        {
+          "file": "review/codex.components-review.test.ts",
+          "passed": 9,
+          "failed": 0
+        },
+        {
+          "file": "review/codex.store-review.test.ts",
+          "passed": 37,
+          "failed": 0
+        },
+        {
+          "file": "review/domain.review.test.ts",
+          "passed": 18,
+          "failed": 0
+        },
+        {
+          "file": "review/fix.regression.test.ts",
+          "passed": 51,
+          "failed": 0
+        },
+        {
+          "file": "review/github.review.test.ts",
+          "passed": 16,
+          "failed": 0
+        },
+        {
+          "file": "review/store.review.test.ts",
+          "passed": 19,
+          "failed": 0
+        },
+        {
+          "file": "src/domain/domain.test.ts",
+          "passed": 24,
+          "failed": 0
+        },
+        {
+          "file": "src/sync/merge.test.ts",
+          "passed": 8,
+          "failed": 0
+        }
+      ]
+    },
+    {
+      "timezone": "Asia/Shanghai",
+      "command": "TZ=Asia/Shanghai npm run test:review -- --reporter=json --outputFile=/tmp/kaoyan-fix-final-shanghai.json",
+      "exitCode": 0,
+      "total": 182,
+      "passed": 182,
+      "failed": 0,
+      "skipped": 0,
+      "files": [
+        {
+          "file": "review/codex.components-review.test.ts",
+          "passed": 9,
+          "failed": 0
+        },
+        {
+          "file": "review/codex.store-review.test.ts",
+          "passed": 37,
+          "failed": 0
+        },
+        {
+          "file": "review/domain.review.test.ts",
+          "passed": 18,
+          "failed": 0
+        },
+        {
+          "file": "review/fix.regression.test.ts",
+          "passed": 51,
+          "failed": 0
+        },
+        {
+          "file": "review/github.review.test.ts",
+          "passed": 16,
+          "failed": 0
+        },
+        {
+          "file": "review/store.review.test.ts",
+          "passed": 19,
+          "failed": 0
+        },
+        {
+          "file": "src/domain/domain.test.ts",
+          "passed": 24,
+          "failed": 0
+        },
+        {
+          "file": "src/sync/merge.test.ts",
+          "passed": 8,
+          "failed": 0
+        }
+      ]
+    },
+    {
+      "timezone": "America/New_York",
+      "command": "TZ=America/New_York npm run test:review -- --reporter=json --outputFile=/tmp/kaoyan-fix-final-newyork.json",
+      "exitCode": 0,
+      "total": 182,
+      "passed": 182,
+      "failed": 0,
+      "skipped": 0,
+      "files": [
+        {
+          "file": "review/codex.components-review.test.ts",
+          "passed": 9,
+          "failed": 0
+        },
+        {
+          "file": "review/codex.store-review.test.ts",
+          "passed": 37,
+          "failed": 0
+        },
+        {
+          "file": "review/domain.review.test.ts",
+          "passed": 18,
+          "failed": 0
+        },
+        {
+          "file": "review/fix.regression.test.ts",
+          "passed": 51,
+          "failed": 0
+        },
+        {
+          "file": "review/github.review.test.ts",
+          "passed": 16,
+          "failed": 0
+        },
+        {
+          "file": "review/store.review.test.ts",
+          "passed": 19,
+          "failed": 0
+        },
+        {
+          "file": "src/domain/domain.test.ts",
+          "passed": 24,
+          "failed": 0
+        },
+        {
+          "file": "src/sync/merge.test.ts",
+          "passed": 8,
+          "failed": 0
+        }
+      ]
+    }
+  ],
+  "checks": [
+    {
+      "command": "npm test",
+      "passed": 32,
+      "failed": 0,
+      "exitCode": 0
+    },
+    {
+      "command": "npx tsc -p tsconfig.review.json --noEmit",
+      "exitCode": 0
+    },
+    {
+      "command": "npm run build",
+      "exitCode": 0
+    },
+    {
+      "command": "git diff --check",
+      "exitCode": 0
+    }
+  ],
+  "environment": {
+    "database": "isolated fake-indexeddb",
+    "network": "mocked; no GitHub requests or real tokens",
+    "locks": "native Node 24 Web Locks, multiple simulated store/DB instances",
+    "components": "actual handlers with mocked React scheduling, not DOM integration",
+    "iOSDeviceTested": false
+  }
+}

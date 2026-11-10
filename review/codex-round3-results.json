@@ -1,0 +1,558 @@
+{
+  "date": "2026-11-10",
+  "base": "88b7396 plus existing uncommitted round2 changes",
+  "groups": {
+    "g1": {
+      "checks": [
+        {
+          "name": "types",
+          "command": [
+            "npx",
+            "tsc",
+            "-p",
+            "tsconfig.review.json",
+            "--noEmit"
+          ],
+          "timezone": null,
+          "exitCode": 0
+        },
+        {
+          "name": "default",
+          "command": [
+            "npm",
+            "run",
+            "test:review",
+            "--",
+            "--reporter=json",
+            "--outputFile=/tmp/r3-g1-default.json"
+          ],
+          "timezone": null,
+          "exitCode": 0
+        },
+        {
+          "name": "shanghai",
+          "command": [
+            "npm",
+            "run",
+            "test:review",
+            "--",
+            "--reporter=json",
+            "--outputFile=/tmp/r3-g1-shanghai.json"
+          ],
+          "timezone": "Asia/Shanghai",
+          "exitCode": 0
+        },
+        {
+          "name": "newyork",
+          "command": [
+            "npm",
+            "run",
+            "test:review",
+            "--",
+            "--reporter=json",
+            "--outputFile=/tmp/r3-g1-newyork.json"
+          ],
+          "timezone": "America/New_York",
+          "exitCode": 0
+        }
+      ],
+      "runs": {
+        "default": {
+          "numTotalTests": 185,
+          "numPassedTests": 185,
+          "numFailedTests": 0,
+          "numPendingTests": 0
+        },
+        "shanghai": {
+          "numTotalTests": 185,
+          "numPassedTests": 185,
+          "numFailedTests": 0,
+          "numPendingTests": 0
+        },
+        "newyork": {
+          "numTotalTests": 185,
+          "numPassedTests": 185,
+          "numFailedTests": 0,
+          "numPendingTests": 0
+        }
+      }
+    },
+    "g2-final": {
+      "checks": [
+        {
+          "name": "types",
+          "command": [
+            "npx",
+            "tsc",
+            "-p",
+            "tsconfig.review.json",
+            "--noEmit"
+          ],
+          "timezone": null,
+          "exitCode": 0
+        },
+        {
+          "name": "default",
+          "command": [
+            "npm",
+            "run",
+            "test:review",
+            "--",
+            "--reporter=json",
+            "--outputFile=/tmp/r3-g2-final-default.json"
+          ],
+          "timezone": null,
+          "exitCode": 0
+        },
+        {
+          "name": "shanghai",
+          "command": [
+            "npm",
+            "run",
+            "test:review",
+            "--",
+            "--reporter=json",
+            "--outputFile=/tmp/r3-g2-final-shanghai.json"
+          ],
+          "timezone": "Asia/Shanghai",
+          "exitCode": 0
+        },
+        {
+          "name": "newyork",
+          "command": [
+            "npm",
+            "run",
+            "test:review",
+            "--",
+            "--reporter=json",
+            "--outputFile=/tmp/r3-g2-final-newyork.json"
+          ],
+          "timezone": "America/New_York",
+          "exitCode": 0
+        }
+      ],
+      "runs": {
+        "default": {
+          "numTotalTests": 190,
+          "numPassedTests": 190,
+          "numFailedTests": 0,
+          "numPendingTests": 0
+        },
+        "shanghai": {
+          "numTotalTests": 190,
+          "numPassedTests": 190,
+          "numFailedTests": 0,
+          "numPendingTests": 0
+        },
+        "newyork": {
+          "numTotalTests": 190,
+          "numPassedTests": 190,
+          "numFailedTests": 0,
+          "numPendingTests": 0
+        }
+      }
+    },
+    "g3-final": {
+      "checks": [
+        {
+          "name": "types",
+          "command": [
+            "npx",
+            "tsc",
+            "-p",
+            "tsconfig.review.json",
+            "--noEmit"
+          ],
+          "timezone": null,
+          "exitCode": 0
+        },
+        {
+          "name": "default",
+          "command": [
+            "npm",
+            "run",
+            "test:review",
+            "--",
+            "--reporter=json",
+            "--outputFile=/tmp/r3-g3-final-default.json"
+          ],
+          "timezone": null,
+          "exitCode": 0
+        },
+        {
+          "name": "shanghai",
+          "command": [
+            "npm",
+            "run",
+            "test:review",
+            "--",
+            "--reporter=json",
+            "--outputFile=/tmp/r3-g3-final-shanghai.json"
+          ],
+          "timezone": "Asia/Shanghai",
+          "exitCode": 0
+        },
+        {
+          "name": "newyork",
+          "command": [
+            "npm",
+            "run",
+            "test:review",
+            "--",
+            "--reporter=json",
+            "--outputFile=/tmp/r3-g3-final-newyork.json"
+          ],
+          "timezone": "America/New_York",
+          "exitCode": 0
+        }
+      ],
+      "runs": {
+        "default": {
+          "numTotalTests": 194,
+          "numPassedTests": 194,
+          "numFailedTests": 0,
+          "numPendingTests": 0
+        },
+        "shanghai": {
+          "numTotalTests": 194,
+          "numPassedTests": 194,
+          "numFailedTests": 0,
+          "numPendingTests": 0
+        },
+        "newyork": {
+          "numTotalTests": 194,
+          "numPassedTests": 194,
+          "numFailedTests": 0,
+          "numPendingTests": 0
+        }
+      }
+    },
+    "g4": {
+      "checks": [
+        {
+          "name": "types",
+          "command": [
+            "npx",
+            "tsc",
+            "-p",
+            "tsconfig.review.json",
+            "--noEmit"
+          ],
+          "timezone": null,
+          "exitCode": 0
+        },
+        {
+          "name": "default",
+          "command": [
+            "npm",
+            "run",
+            "test:review",
+            "--",
+            "--reporter=json",
+            "--outputFile=/tmp/r3-g4-default.json"
+          ],
+          "timezone": null,
+          "exitCode": 0
+        },
+        {
+          "name": "shanghai",
+          "command": [
+            "npm",
+            "run",
+            "test:review",
+            "--",
+            "--reporter=json",
+            "--outputFile=/tmp/r3-g4-shanghai.json"
+          ],
+          "timezone": "Asia/Shanghai",
+          "exitCode": 0
+        },
+        {
+          "name": "newyork",
+          "command": [
+            "npm",
+            "run",
+            "test:review",
+            "--",
+            "--reporter=json",
+            "--outputFile=/tmp/r3-g4-newyork.json"
+          ],
+          "timezone": "America/New_York",
+          "exitCode": 0
+        }
+      ],
+      "runs": {
+        "default": {
+          "numTotalTests": 201,
+          "numPassedTests": 201,
+          "numFailedTests": 0,
+          "numPendingTests": 0
+        },
+        "shanghai": {
+          "numTotalTests": 201,
+          "numPassedTests": 201,
+          "numFailedTests": 0,
+          "numPendingTests": 0
+        },
+        "newyork": {
+          "numTotalTests": 201,
+          "numPassedTests": 201,
+          "numFailedTests": 0,
+          "numPendingTests": 0
+        }
+      }
+    },
+    "final": {
+      "checks": [
+        {
+          "name": "types",
+          "command": [
+            "npx",
+            "tsc",
+            "-p",
+            "tsconfig.review.json",
+            "--noEmit"
+          ],
+          "timezone": null,
+          "exitCode": 0
+        },
+        {
+          "name": "default",
+          "command": [
+            "npm",
+            "run",
+            "test:review",
+            "--",
+            "--reporter=json",
+            "--outputFile=/tmp/r3-final-default.json"
+          ],
+          "timezone": null,
+          "exitCode": 0
+        },
+        {
+          "name": "shanghai",
+          "command": [
+            "npm",
+            "run",
+            "test:review",
+            "--",
+            "--reporter=json",
+            "--outputFile=/tmp/r3-final-shanghai.json"
+          ],
+          "timezone": "Asia/Shanghai",
+          "exitCode": 0
+        },
+        {
+          "name": "newyork",
+          "command": [
+            "npm",
+            "run",
+            "test:review",
+            "--",
+            "--reporter=json",
+            "--outputFile=/tmp/r3-final-newyork.json"
+          ],
+          "timezone": "America/New_York",
+          "exitCode": 0
+        }
+      ],
+      "runs": {
+        "default": {
+          "numTotalTests": 203,
+          "numPassedTests": 203,
+          "numFailedTests": 0,
+          "numPendingTests": 0
+        },
+        "shanghai": {
+          "numTotalTests": 203,
+          "numPassedTests": 203,
+          "numFailedTests": 0,
+          "numPendingTests": 0
+        },
+        "newyork": {
+          "numTotalTests": 203,
+          "numPassedTests": 203,
+          "numFailedTests": 0,
+          "numPendingTests": 0
+        }
+      }
+    },
+    "final2": {
+      "checks": [
+        {
+          "name": "types",
+          "command": [
+            "npx",
+            "tsc",
+            "-p",
+            "tsconfig.review.json",
+            "--noEmit"
+          ],
+          "timezone": null,
+          "exitCode": 0
+        },
+        {
+          "name": "default",
+          "command": [
+            "npm",
+            "run",
+            "test:review",
+            "--",
+            "--reporter=json",
+            "--outputFile=/tmp/r3-final2-default.json"
+          ],
+          "timezone": null,
+          "exitCode": 0
+        },
+        {
+          "name": "shanghai",
+          "command": [
+            "npm",
+            "run",
+            "test:review",
+            "--",
+            "--reporter=json",
+            "--outputFile=/tmp/r3-final2-shanghai.json"
+          ],
+          "timezone": "Asia/Shanghai",
+          "exitCode": 0
+        },
+        {
+          "name": "newyork",
+          "command": [
+            "npm",
+            "run",
+            "test:review",
+            "--",
+            "--reporter=json",
+            "--outputFile=/tmp/r3-final2-newyork.json"
+          ],
+          "timezone": "America/New_York",
+          "exitCode": 0
+        }
+      ],
+      "runs": {
+        "default": {
+          "numTotalTests": 204,
+          "numPassedTests": 204,
+          "numFailedTests": 0,
+          "numPendingTests": 0
+        },
+        "shanghai": {
+          "numTotalTests": 204,
+          "numPassedTests": 204,
+          "numFailedTests": 0,
+          "numPendingTests": 0
+        },
+        "newyork": {
+          "numTotalTests": 204,
+          "numPassedTests": 204,
+          "numFailedTests": 0,
+          "numPendingTests": 0
+        }
+      }
+    }
+  },
+  "before": {
+    "g1": [
+      {
+        "test": "T1 preserves untouched milliseconds (40000)",
+        "failure": "AssertionError: expected { Object (id, subjectId, ...) } to match object { subjectId: 'os', …(1) }"
+      },
+      {
+        "test": "T1 preserves untouched milliseconds (1500000)",
+        "failure": "AssertionError: expected { Object (id, subjectId, ...) } to match object { subjectId: 'os', …(1) }"
+      },
+      {
+        "test": "T2 an already open correction survives an equivalent refresh/visibility check",
+        "failure": "AssertionError: expected 'choose' to be 'endAt' // Object.is equality"
+      }
+    ],
+    "g2": [
+      {
+        "test": "T5 subscription function remains stable across renders",
+        "failure": "AssertionError: expected [Function] to be [Function] // Object.is equality"
+      },
+      {
+        "test": "T3 no-op reload and sync preserve data references",
+        "failure": "AssertionError: expected [ { id: 'same', …(7) } ] to be [ { id: 'same', …(7) } ] // Object.is equality"
+      },
+      {
+        "test": "T4 equal sessions avoid serializing their fingerprints",
+        "failure": "AssertionError: expected 2 to be +0 // Object.is equality"
+      }
+    ],
+    "g2-throttle": [
+      {
+        "test": "T4 clean foreground refreshes within five minutes avoid another download",
+        "failure": "AssertionError: expected \"vi.fn()\" to not be called at all, but actually been called 1 times"
+      }
+    ],
+    "g3": [
+      {
+        "test": "T6 automatic triggers honor Retry-After while manual sync can bypass it",
+        "failure": "AssertionError: expected \"vi.fn()\" to be called 1 times, but got 2 times"
+      },
+      {
+        "test": "T7 flushes a pending debounce on visibilitychange",
+        "failure": "AssertionError: expected \"vi.fn()\" to be called 1 times, but got 0 times"
+      },
+      {
+        "test": "T7 flushes a pending debounce on pagehide",
+        "failure": "AssertionError: expected \"vi.fn()\" to be called 1 times, but got 0 times"
+      },
+      {
+        "test": "T8 timer writes are canonical even after clock rollback",
+        "failure": "AssertionError: expected [ { …(8) } ] to deeply equal [ { …(8) } ]"
+      }
+    ],
+    "g4": [
+      {
+        "test": "T10 manual overlapping rows are rejected before saving",
+        "failure": "AssertionError: expected 1 to be +0 // Object.is equality"
+      },
+      {
+        "test": "T9 rejects unsafe new date edits {\"examDate\":\"2207-12-25\"}",
+        "failure": "AssertionError: expected true to be false // Object.is equality"
+      },
+      {
+        "test": "T9 rejects unsafe new date edits {\"startDate\":\"1900-01-01\"}",
+        "failure": "AssertionError: expected true to be false // Object.is equality"
+      },
+      {
+        "test": "T9 rejects unsafe new date edits {\"startDate\":\"2028-01-01\"}",
+        "failure": "AssertionError: expected true to be false // Object.is equality"
+      },
+      {
+        "test": "T9 legacy out-of-range dates recover without rejecting sessions",
+        "failure": "AssertionError: expected false to be true // Object.is equality"
+      }
+    ],
+    "g4-blur": [
+      {
+        "test": "T10 manual overlapping rows are rejected before saving",
+        "failure": "AssertionError: expected 1 to be +0 // Object.is equality"
+      },
+      {
+        "test": "T9 date typing does not persist until blur",
+        "failure": "AssertionError: expected '2027-12-20' to be '2027-12-25' // Object.is equality"
+      }
+    ],
+    "g5": [
+      {
+        "test": "T11 waiting to change configuration must not block pause",
+        "failure": "AssertionError: expected false to be true // Object.is equality"
+      }
+    ],
+    "legacy": [
+      {
+        "test": "T9 legacy local dates remain safe through import and synchronization",
+        "failure": "AssertionError: expected false to be true // Object.is equality"
+      }
+    ]
+  },
+  "limits": [
+    "fake-indexeddb, mocked network and React hook scheduling; no iOS device verification",
+    "T3 still reads full table; T4 no SHA/ETag cache"
+  ]
+}

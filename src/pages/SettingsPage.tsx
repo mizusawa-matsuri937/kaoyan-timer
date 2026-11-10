@@ -69,6 +69,11 @@ export function SettingsPage() {
   const [path, setPath] = useState(cfg?.path ?? 'data.json')
   const [showHelp, setShowHelp] = useState(!cfg)
   const [usage, setUsage] = useState<string | null>(null)
+  const [dateDraft, setDateDraft] = useState<Partial<Record<'examDate' | 'startDate', string>>>({})
+  const commitDate = async (key: 'examDate' | 'startDate', value: string) => {
+    if (value && value !== settings[key]) await updateSettings({ [key]: value })
+    setDateDraft(current => { const next = { ...current }; delete next[key]; return next })
+  }
   const fileRef = useRef<HTMLInputElement>(null)
 
   useEffect(() => {
@@ -131,16 +136,18 @@ export function SettingsPage() {
           <input
             type="date"
             className="field !w-auto !py-1.5 text-right"
-            value={settings.examDate}
-            onChange={(e) => e.target.value && updateSettings({ examDate: e.target.value })}
+            value={dateDraft.examDate ?? settings.examDate}
+            onChange={(e) => setDateDraft(current => ({ ...current, examDate: e.target.value }))}
+            onBlur={(e) => commitDate('examDate', e.currentTarget.value)}
           />
         </Row>
         <Row label="备考开始日期" hint="热度表从这天开始">
           <input
             type="date"
             className="field !w-auto !py-1.5 text-right"
-            value={settings.startDate}
-            onChange={(e) => e.target.value && updateSettings({ startDate: e.target.value })}
+            value={dateDraft.startDate ?? settings.startDate}
+            onChange={(e) => setDateDraft(current => ({ ...current, startDate: e.target.value }))}
+            onBlur={(e) => commitDate('startDate', e.currentTarget.value)}
           />
         </Row>
       </div>

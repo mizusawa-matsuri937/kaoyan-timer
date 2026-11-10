@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { segmentsTotal, uuid } from '../domain/timer'
 import { formatDurationCN } from '../domain/format'
 import { SUBJECTS } from '../domain/subjects'
@@ -17,6 +17,7 @@ const fromInput = (v: string) => new Date(v).getTime()
 interface Row {
   start: string
   end: string
+  original?: { start: number; end: number }
 }
 
 export type EditorTarget = { kind: 'new'; day: string } | { kind: 'edit'; session: Session } | null
@@ -38,43 +39,66 @@ export function SessionEditor({ target, onClose }: { target: EditorTarget; onClo
   const [subjectId, setSubjectId] = useState('ds')
   const [rows, setRows] = useState<Row[]>([])
   const [confirmDel, setConfirmDel] = useState(false)
+  const [saving, setSaving] = useState(false)
+  const inFlight = useRef(false)
+  const draft = useRef<{ target: EditorTarget; id: string | null }>({ target: null, id: null })
+  if (draft.current.target !== target) draft.current = { target, id: null }
+  const close = () => { if (!inFlight.current) onClose() }
+
+  const submit = async (action: () => Promise<boolean>, message: string) => {
+    if (inFlight.current) return
+    inFlight.current = true
+    setSaving(true)
+    try {
+      if (await action()) {
+        showToast(message, 'success')
+        if (draft.current.target === target) onClose()
+      }
+    } catch {
+      showToast('保存失败，请重试', 'error')
+    } finally {
+      inFlight.current = false
+      setSaving(false)
+    }
+  }
 
   useEffect(() => {
     if (!target) return
     setConfirmDel(false)
     if (target.kind === 'edit') {
       setSubjectId(target.session.subjectId)
-      setRows(target.session.segments.map((g) => ({ start: toInput(g.start), end: toInput(g.end) })))
+      setRows(target.session.segments.map((g) => ({ start: toInput(g.start), end: toInput(g.end), original: g })))
     } else {
       setRows([defaultRow(target.day)])
     }
   }, [target])
 
-  const segments = rows.map((r) => ({ start: fromInput(r.start), end: fromInput(r.end) }))
+  const segments = rows.map((r) => ({ start: r.original && r.start === toInput(r.original.start) ? r.original.start : fromInput(r.start), end: r.original && r.end === toInput(r.original.end) ? r.original.end : fromInput(r.end) }))
   const invalid = segments.findIndex((g) => !Number.isFinite(g.start) || !Number.isFinite(g.end) || g.end <= g.start)
   const future = segments.some((g) => g.end > Date.now() + 60000)
   const total = invalid === -1 ? segmentsTotal(segments) : 0
 
   const save = async () => {
-    if (!target) return
+    if (!target || inFlight.current) return
     if (invalid !== -1) return showToast(`第 ${invalid + 1} 段的结束时间必须晚于开始时间`, 'error')
+    const ordered = segments.map((g, i) => ({ ...g, i })).sort((a,b) => a.start - b.start)
+    for (let i = 1; i < ordered.length; i++) {
+      if (ordered[i].start < ordered[i-1].end) return showToast(`第 ${ordered[i-1].i+1} 段与第 ${ordered[i].i+1} 段重叠，请调整时间`, 'error')
+    }
     if (future) return showToast('不能记录未来的时间', 'error')
     const now = Date.now()
     const base: Session =
       target.kind === 'edit'
         ? target.session
-        : { id: uuid(), subjectId, segments: [], startAt: 0, source: 'manual', createdAt: now, updatedAt: now, deleted: false }
-    const ok = await saveSession(
+        : { id: (draft.current.id ??= uuid()), subjectId, segments: [], startAt: 0, source: 'manual', createdAt: now, updatedAt: now, deleted: false }
+    await submit(() => saveSession(
       { ...base, subjectId, segments },
-      target.kind === 'edit' ? { expectedUpdatedAt: target.session.updatedAt } : {},
-    )
-    if (!ok) return // 失败/冲突的提示由 store 给出，面板保持打开
-    showToast(target.kind === 'edit' ? '已修改' : '已补录', 'success')
-    onClose()
+      target.kind === 'edit' ? { expectedSession: target.session } : {},
+    ), target.kind === 'edit' ? '已修改' : '已补录')
   }
 
   return (
-    <Sheet open={!!target} onClose={onClose} title={target?.kind === 'edit' ? '修改记录' : '补录学习时间'}>
+    <Sheet open={!!target} onClose={close} title={target?.kind === 'edit' ? '修改记录' : '补录学习时间'}>
       <div className="mb-2 text-[13px] font-semibold text-muted">科目</div>
       <div className="flex flex-wrap gap-2">
         {SUBJECTS.map((s) => {
@@ -143,16 +167,14 @@ export function SessionEditor({ target, onClose }: { target: EditorTarget; onClo
       </div>
 
       <div className="mt-6 grid gap-2.5">
-        <Button onClick={save}>保存</Button>
+        <Button onClick={save} disabled={saving}>保存</Button>
         {target?.kind === 'edit' && (
           <Button
             variant="danger"
+            disabled={saving}
             onClick={async () => {
               if (!confirmDel) return setConfirmDel(true)
-              const ok = await deleteSession(target.session.id, { expectedUpdatedAt: target.session.updatedAt })
-              if (!ok) return
-              showToast('已删除', 'success')
-              onClose()
+              await submit(() => deleteSession(target.session.id, { expectedSession: target.session }), '已删除')
             }}
           >
             <span className="inline-flex items-center gap-1.5">

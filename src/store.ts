@@ -13,16 +13,19 @@ import {
 } from './domain/timer'
 import type { ActiveTimer, Session, Settings, SyncConfig } from './domain/types'
 import { GitHubError, getFile, isConflict, isTransient, putFile } from './sync/github'
+import { SyncCoordinationError, withSyncConfigLock } from './sync/coordination'
 import {
   checkSession,
   checkSettings,
   compareSettings,
+  compareSessions,
   describeInvalid,
   makeBackup,
   mergeSessions,
   mergeSettings,
   nextRevision,
   parseBackup,
+  sessionFingerprint,
   type ParsedBackup,
 } from './sync/merge'
 
@@ -46,15 +49,34 @@ export interface AppState {
   toast: Toast | null
 }
 
+// 默认初试日期取"明年 12 月 25 日"，保证任何时候新安装都满足"开始不晚于初试"
+const TODAY = dayKey(Date.now())
 const DEFAULT_SETTINGS: Settings = {
-  examDate: '2027-12-25',
-  startDate: dayKey(Date.now()),
+  examDate: `${Number(TODAY.slice(0, 4)) + 1}-12-25`,
+  startDate: TODAY,
   overtimeHours: 4,
   keepAwake: false,
   updatedAt: 0,
 }
 
 const EMPTY_SYNC_META: SyncMeta = { lastSyncAt: null, dirty: false, lastError: null, seq: 0 }
+
+let committedSettings = DEFAULT_SETTINGS
+let settingsIntent = 0
+const pendingSettings = new Map<number, { patch: Partial<Settings>; at: number }>()
+
+/** UI drafts are replayed over the latest committed settings; exports use only the latter. */
+function settingsView(stored = committedSettings): Settings {
+  committedSettings = stored
+  let view = stored
+  for (const { patch, at } of pendingSettings.values()) {
+    try {
+      const checked = checkSettings({ ...view, ...patch, updatedAt: nextRevision(view.updatedAt, at) })
+      if (checked.ok) view = checked.value
+    } catch { /* an exhausted revision is reported when this intent executes */ }
+  }
+  return view
+}
 
 let state: AppState = {
   loaded: false,
@@ -71,6 +93,13 @@ let state: AppState = {
 const listeners = new Set<() => void>()
 
 function setState(patch: Partial<AppState>) {
+  if (patch.sessions && patch.sessions.length === state.sessions.length) {
+    const previous = new Map(state.sessions.map(s => [s.id, s]))
+    if (patch.sessions.every(s => previous.has(s.id) && compareSessions(s, previous.get(s.id)!) === 0)) patch.sessions = state.sessions
+  }
+  if (patch.settings && compareSettings(patch.settings, state.settings) === 0) patch.settings = state.settings
+  // Full content equality here; sameTimer's intentionally partial comparison is for operation fencing.
+  if ('active' in patch && JSON.stringify(patch.active) === JSON.stringify(state.active)) patch.active = state.active
   state = { ...state, ...patch }
   for (const l of listeners) l()
 }
@@ -79,12 +108,14 @@ export function getState(): AppState {
   return state
 }
 
+function subscribe(cb: () => void) {
+  listeners.add(cb)
+  return () => { listeners.delete(cb) }
+}
+
 export function useApp<T>(selector: (s: AppState) => T): T {
   return useSyncExternalStore(
-    (cb) => {
-      listeners.add(cb)
-      return () => listeners.delete(cb)
-    },
+    subscribe,
     () => selector(state),
   )
 }
@@ -178,6 +209,7 @@ interface Snapshot {
   sessions: Session[]
   active: ActiveTimer | null
   timerRev: number
+  syncConfigRev: number
   settings: Settings
   syncConfig: SyncConfig | null
   syncMeta: SyncMeta
@@ -189,12 +221,14 @@ async function readSnapshotInTx(): Promise<Snapshot> {
   const timerRev = (await getMeta('timerRev')) ?? 0
   const stored = await getMeta('settings')
   const syncConfig = (await getMeta('syncConfig')) ?? null
+  const syncConfigRev = (await getMeta('syncConfigRev')) ?? 0
   const syncMeta = (await getMeta('syncMeta')) ?? EMPTY_SYNC_META
   const checked = stored ? checkSettings({ ...DEFAULT_SETTINGS, ...stored }) : null
   return {
     sessions,
     active,
     timerRev,
+    syncConfigRev,
     settings: checked?.ok ? checked.value : DEFAULT_SETTINGS,
     syncConfig,
     syncMeta: { ...EMPTY_SYNC_META, ...syncMeta },
@@ -203,6 +237,7 @@ async function readSnapshotInTx(): Promise<Snapshot> {
 
 /** 本标签页已知的数据库计时修订号 */
 let knownTimerRev = 0
+let knownSyncConfigRev = 0
 /** 内存中的计时器被"外部"（其他标签页的结果）替换的次数；点击时捕获，执行前不一致说明用户操作的是过期画面 */
 let externalEpoch = 0
 
@@ -212,13 +247,15 @@ function adoptTimer(active: ActiveTimer | null, timerRev: number) {
 }
 
 function publishSnapshot(snap: Snapshot) {
-  if (!sameConfig(snap.syncConfig, state.syncConfig)) invalidateSync() // 其他标签页改了备份配置
+  const configChanged = !sameConfig(snap.syncConfig, state.syncConfig) || snap.syncConfigRev !== knownSyncConfigRev
+  if (configChanged) invalidateSync()
+  knownSyncConfigRev = snap.syncConfigRev
   adoptTimer(snap.active, snap.timerRev)
   setState({
     loaded: true,
     sessions: snap.sessions,
     active: snap.active,
-    settings: snap.settings,
+    settings: settingsView(snap.settings),
     syncConfig: snap.syncConfig,
     sync: {
       ...snap.syncMeta,
@@ -226,7 +263,7 @@ function publishSnapshot(snap: Snapshot) {
         ? 'disabled'
         : running
           ? 'syncing'
-          : state.sync.status === 'disabled'
+          : configChanged || state.sync.status === 'disabled' || state.sync.status === 'syncing'
             ? 'idle'
             : state.sync.status,
     },
@@ -333,13 +370,18 @@ function timerOp(intent: TimerIntent): Promise<boolean> {
       const result = await rwTx(async () => {
         const current = (await getMeta('activeTimer')) ?? null
         const rev = (await getMeta('timerRev')) ?? 0
-        if (!sameTimer(current, expected) || rev !== expectedRev) return { stale: true as const, current, rev }
+        if (!sameTimer(current, expected) || rev !== expectedRev) {
+          return { stale: true as const, snapshot: await readSnapshotInTx() }
+        }
         const plan = planTimer(intent, current, at)
         if (!plan) return { stale: false as const, plan: null, syncMeta: null, rev }
         let finished = plan.finished
         if (finished) {
           const existing = await db.sessions.get(finished.id)
           finished = { ...finished, updatedAt: nextRevision(existing?.updatedAt, Math.max(at, finished.updatedAt)) }
+          const checked = checkSession(finished)
+          if (!checked.ok) throw new Error(checked.reason)
+          finished = checked.value
           await db.sessions.put(finished)
         }
         if (plan.active !== undefined) await setMeta('activeTimer', plan.active)
@@ -348,8 +390,7 @@ function timerOp(intent: TimerIntent): Promise<boolean> {
         return { stale: false as const, plan: { ...plan, finished }, syncMeta, rev: rev + 1 }
       })
       if (result.stale) {
-        adoptTimer(result.current, result.rev)
-        setState({ active: result.current })
+        publishSnapshot(result.snapshot)
         showToast('其他窗口已更新计时，已刷新为最新状态，请再操作一次', 'info')
         return false
       }
@@ -398,8 +439,8 @@ export function resolveOvertime(choice: OvertimeChoice): Promise<boolean> {
 // ---------- 记录编辑 ----------
 
 export interface EditOptions {
-  /** 编辑时打开的版本；数据库里已不是这个版本（其他窗口改过）时拒绝保存 */
-  expectedUpdatedAt?: number
+  /** The complete snapshot shown when the editor opened, including same-revision content. */
+  expectedSession?: Session
 }
 
 function sessionOp(
@@ -407,11 +448,12 @@ function sessionOp(
   build: (existing: Session | undefined) => Session | null | 'stale',
   opts: EditOptions,
 ): Promise<boolean> {
+  const expected = opts.expectedSession ? sessionFingerprint(opts.expectedSession) : undefined
   return serial(async () => {
     try {
       const result = await rwTx(async () => {
         const existing = await db.sessions.get(id)
-        if (opts.expectedUpdatedAt !== undefined && existing && existing.updatedAt !== opts.expectedUpdatedAt) {
+        if (expected !== undefined && (!existing || sessionFingerprint(existing) !== expected)) {
           return { stale: true as const, existing }
         }
         const row = build(existing)
@@ -470,33 +512,41 @@ export function deleteSession(id: string, opts: EditOptions = {}): Promise<boole
 // ---------- 设置 ----------
 
 export function updateSettings(patch: Partial<Settings>): Promise<boolean> {
+  patch = { ...patch }
   const at = Date.now()
-  const optimistic = checkSettings({ ...state.settings, ...patch, updatedAt: nextRevision(state.settings.updatedAt, at) })
-  if (!optimistic.ok) {
-    showToast(`设置无效：${optimistic.reason}`, 'error')
+  try {
+    const optimistic = checkSettings({ ...state.settings, ...patch, updatedAt: nextRevision(state.settings.updatedAt, at) }, true)
+    if (!optimistic.ok) throw new Error(optimistic.reason)
+  } catch (e) {
+    reportSaveError(e)
     return Promise.resolve(false)
   }
-  setState({ settings: optimistic.value }) // 先更新界面，提交失败时回滚为数据库中的值
+  const intent = ++settingsIntent
+  pendingSettings.set(intent, { patch: { ...patch }, at })
+  setState({ settings: settingsView() })
   return serial(async () => {
     try {
       const result = await rwTx(async () => {
         const raw = await getMeta('settings')
         const valid = raw ? checkSettings({ ...DEFAULT_SETTINGS, ...raw }) : null
         const stored = valid?.ok ? valid.value : DEFAULT_SETTINGS
-        const next = checkSettings({ ...stored, ...patch, updatedAt: nextRevision(raw?.updatedAt ?? stored.updatedAt, at) })
+        const next = checkSettings({ ...stored, ...patch, updatedAt: nextRevision(raw?.updatedAt ?? stored.updatedAt, at) }, true)
         if (!next.ok) throw new Error(next.reason)
         await setMeta('settings', next.value)
         return { settings: next.value, syncMeta: await bumpDirtyInTx() }
       })
-      setState({ settings: result.settings })
+      pendingSettings.delete(intent)
+      setState({ settings: settingsView(result.settings) })
       publishSyncMeta(result.syncMeta)
       notifyOtherTabs()
       scheduleSync()
       return true
     } catch (e) {
       reportSaveError(e)
+      pendingSettings.delete(intent)
       const stored = await getMeta('settings').catch(() => undefined)
-      if (stored) setState({ settings: stored })
+      const checked = stored ? checkSettings(stored) : null
+      setState({ settings: settingsView(checked?.ok ? checked.value : committedSettings) })
       return false
     }
   })
@@ -505,21 +555,24 @@ export function updateSettings(patch: Partial<Settings>): Promise<boolean> {
 export async function setSyncConfig(cfg: SyncConfig | null): Promise<void> {
   // 先让进行中的同步、排队的重试全部失效，关闭后不会再开始新的上传
   invalidateSync()
-  const result = await serial(() =>
-    rwTx(async () => {
+  const result = await withSyncConfigLock(() =>
+    serial(() => rwTx(async () => {
       await setMeta('syncConfig', cfg)
+      const configRev = nextRevision(await getMeta('syncConfigRev'))
+      await setMeta('syncConfigRev', configRev)
       const cur = (await getMeta('syncMeta')) ?? EMPTY_SYNC_META
       const next: SyncMeta = { ...EMPTY_SYNC_META, ...cur, lastError: null }
       await setMeta('syncMeta', next)
-      return next
-    }),
+      return { meta: next, configRev }
+    })), { disabling: cfg === null },
   ).catch((e) => {
     reportSaveError(e)
     return null
   })
   if (!result) return
+  knownSyncConfigRev = result.configRev
   setState({ syncConfig: cfg })
-  publishSyncMeta(result, cfg ? 'idle' : 'disabled')
+  publishSyncMeta(result.meta, cfg ? 'idle' : 'disabled')
   notifyOtherTabs()
   if (cfg) await syncNow({ manual: true })
 }
@@ -527,7 +580,7 @@ export async function setSyncConfig(cfg: SyncConfig | null): Promise<void> {
 // ---------- 导入导出 ----------
 
 export function exportBackupText(): string {
-  return JSON.stringify(makeBackup(state.sessions, state.settings, Date.now()), null, 1)
+  return JSON.stringify(makeBackup(state.sessions, committedSettings, Date.now()), null, 1)
 }
 
 /** 导入备份：整个文件校验通过才会写入，有任何损坏记录都整体拒绝 */
@@ -548,7 +601,7 @@ export async function importBackupText(text: string): Promise<number> {
       const syncMeta = toLocal.length || settingsChanged ? await bumpDirtyInTx() : null
       return { toLocal, settings, syncMeta }
     })
-    setState({ sessions: upsert(state.sessions, result.toLocal), settings: result.settings })
+    setState({ sessions: upsert(state.sessions, result.toLocal), settings: settingsView(result.settings) })
     if (result.syncMeta) {
       publishSyncMeta(result.syncMeta)
       notifyOtherTabs()
@@ -577,6 +630,7 @@ let syncAbort: AbortController | null = null
 let syncTimer: ReturnType<typeof setTimeout> | undefined
 let retryTimer: ReturnType<typeof setTimeout> | undefined
 let retryAttempt = 0
+let retryNotBefore = 0
 let running: { gen: number; promise: Promise<void> } | null = null
 let lastAutoSync = 0
 
@@ -590,7 +644,11 @@ function invalidateSync() {
   syncTimer = undefined
   retryTimer = undefined
   retryAttempt = 0
+  retryNotBefore = 0
   running = null
+  if (state.sync.status === 'syncing') {
+    publishSyncMeta(state.sync, state.syncConfig ? 'idle' : 'disabled')
+  }
 }
 
 function scheduleSync(delay = SYNC_DELAY_MS) {
@@ -612,15 +670,21 @@ function scheduleRetry(e: unknown) {
   const hinted = e instanceof GitHubError ? e.retryAfterMs : null
   if (hinted !== null) delay = Math.max(delay, Math.min(hinted, RETRY_AFTER_CAP_MS))
   retryAttempt++
+  delay = Math.ceil(delay)
+  retryNotBefore = hinted !== null ? Date.now() + delay : 0
   retryTimer = setTimeout(() => {
     retryTimer = undefined
+    retryNotBefore = 0 // 定时器到点即可重试；不让系统时钟回拨把这次重试吞掉
     void syncNow()
   }, delay)
 }
 
 /** 等待 p，但取消信号触发时立即结束（即使底层请求不理会信号） */
 function untilAborted<T>(p: Promise<T>, signal: AbortSignal): Promise<T> {
-  if (signal.aborted) return Promise.reject(signal.reason ?? CANCELLED)
+  if (signal.aborted) {
+    void p.catch(() => {})
+    return Promise.reject(signal.reason ?? CANCELLED)
+  }
   return new Promise<T>((resolve, reject) => {
     const onAbort = () => reject(signal.reason ?? CANCELLED)
     signal.addEventListener('abort', onAbort, { once: true })
@@ -641,7 +705,9 @@ function untilAborted<T>(p: Promise<T>, signal: AbortSignal): Promise<T> {
 export function syncNow(opts: { manual?: boolean; throttle?: boolean } = {}): Promise<void> {
   if (!state.syncConfig) return Promise.resolve()
   if (running && running.gen === syncGen) return running.promise
-  if (opts.throttle && Date.now() - lastAutoSync < 30_000) return Promise.resolve()
+  if (!opts.manual && Date.now() < retryNotBefore) return Promise.resolve()
+  if (opts.manual) retryNotBefore = 0
+  if (opts.throttle && Date.now() - lastAutoSync < 5 * 60_000) return Promise.resolve()
   if (typeof navigator !== 'undefined' && navigator.onLine === false) {
     setState({ sync: { ...state.sync, status: 'offline' } })
     if (opts.manual) showToast('当前离线，联网后会自动备份', 'info')
@@ -655,7 +721,10 @@ export function syncNow(opts: { manual?: boolean; throttle?: boolean } = {}): Pr
   lastAutoSync = Date.now()
   const task: { gen: number; promise: Promise<void> } = { gen: syncGen, promise: Promise.resolve() }
   task.promise = runSync(opts.manual ?? false).finally(() => {
-    if (running === task) running = null
+    if (running === task) {
+      running = null
+      if (state.sync.status === 'syncing') publishSyncMeta(state.sync, state.syncConfig ? 'idle' : 'disabled')
+    }
   })
   running = task
   return task.promise
@@ -667,9 +736,30 @@ interface PushPlan {
   seq: number
 }
 
+async function configMatches(cfg: SyncConfig, revision: number): Promise<boolean> {
+  return sameConfig(await getMeta('syncConfig'), cfg) && ((await getMeta('syncConfigRev')) ?? 0) === revision
+}
+
+/** Only dispatch is locked. The returned request is awaited outside both lock and write queue. */
+async function dispatchSyncRequest<T>(cfg: SyncConfig, configRev: number, gen: number, signal: AbortSignal, start: () => Promise<T>): Promise<T> {
+  const { response } = await untilAborted(withSyncConfigLock(async () => {
+    const valid = await db.transaction('r', db.meta, () => configMatches(cfg, configRev))
+    if (signal.aborted || gen !== syncGen || !valid) throw CANCELLED
+    // Attach rejection handling immediately, even if the request fails before the lock releases.
+    return { response: start().then(
+      (value) => ({ ok: true as const, value }),
+      (error: unknown) => ({ ok: false as const, error }),
+    ) }
+  }, { signal }), signal)
+  const result = await untilAborted(response, signal)
+  if (!result.ok) throw result.error
+  return result.value
+}
+
 async function runSync(manual: boolean): Promise<void> {
   const gen = syncGen
   const cfg = state.syncConfig
+  const configRev = knownSyncConfigRev
   if (!cfg) return
   const ac = new AbortController()
   syncAbort = ac
@@ -682,7 +772,7 @@ async function runSync(manual: boolean): Promise<void> {
     let clean = false
     for (let round = 0; round < MAX_ROUNDS && !clean; round++) {
       for (let attempt = 0; ; attempt++) {
-        const remote = await untilAborted(getFile(cfg, { signal: ac.signal }), ac.signal)
+        const remote = await dispatchSyncRequest(cfg, configRev, gen, ac.signal, () => getFile(cfg, { signal: ac.signal }))
         ensure()
         let parsed: ParsedBackup | null = null
         if (remote) {
@@ -696,20 +786,21 @@ async function runSync(manual: boolean): Promise<void> {
           }
         }
         // 网络响应回来后，基于数据库里此刻的最新状态重新合并
-        const plan = await serial(() => applyRemote(parsed, cfg, gen))
+        const plan = await serial(() => applyRemote(parsed, cfg, configRev, gen))
         ensure()
         if (plan.text !== null) {
           const stamp = new Date().toLocaleString('zh-CN', { hour12: false })
           try {
             ensure() // 上传前最后核对一次：配置仍有效
-            await untilAborted(putFile(cfg, plan.text, remote?.sha ?? null, `备份学习记录 ${stamp}`, { signal: ac.signal }), ac.signal)
+            const text = plan.text
+            await dispatchSyncRequest(cfg, configRev, gen, ac.signal, () => putFile(cfg, text, remote?.sha ?? null, `备份学习记录 ${stamp}`, { signal: ac.signal }))
           } catch (e) {
             if (isConflict(e) && attempt < MAX_CONFLICT_RETRIES && alive()) continue // 另一台设备刚更新过，重新拉取合并
             throw e
           }
           ensure()
         }
-        clean = await serial(() => finishSync(plan.seq, cfg, gen))
+        clean = await serial(() => finishSync(plan.seq, cfg, configRev, gen))
         break
       }
     }
@@ -725,8 +816,18 @@ async function runSync(manual: boolean): Promise<void> {
     }
     const msg = errorText(e)
     const offline = typeof navigator !== 'undefined' && navigator.onLine === false
-    await serial(() => recordSyncError(msg, gen, offline ? 'offline' : 'error')).catch(console.error)
-    const permanent = e instanceof PermanentSyncError || (e instanceof GitHubError && !isTransient(e) && !isConflict(e))
+    publishSyncMeta({ ...state.sync, lastError: msg }, offline ? 'offline' : 'error')
+    let configChanged = false
+    await serial(() => recordSyncError(msg, gen, offline ? 'offline' : 'error', cfg, configRev)).catch((error: unknown) => {
+      if (error === CANCELLED) configChanged = true
+      else console.error(error)
+    })
+    if (!alive()) return
+    if (configChanged) { void reloadFromDb(); return }
+    // A queued reload or a failed error write must not erase the in-memory failure state.
+    publishSyncMeta({ ...state.sync, lastError: msg }, offline ? 'offline' : 'error')
+    const permanent = e instanceof PermanentSyncError || e instanceof SyncCoordinationError ||
+      (e as Error)?.name === 'QuotaExceededError' || (e instanceof GitHubError && !isTransient(e) && !isConflict(e))
     if (!permanent && !offline) scheduleRetry(e)
     if (manual) showToast(`同步失败：${msg}`, 'error')
   } finally {
@@ -735,10 +836,10 @@ async function runSync(manual: boolean): Promise<void> {
 }
 
 /** 拉取部分：在一个事务内读取本地最新数据、合并远端、写回，并据此生成要上传的内容 */
-async function applyRemote(parsed: ParsedBackup | null, cfg: SyncConfig, gen: number): Promise<PushPlan> {
+async function applyRemote(parsed: ParsedBackup | null, cfg: SyncConfig, configRev: number, gen: number): Promise<PushPlan> {
   if (gen !== syncGen) throw CANCELLED
   const result = await rwTx(async () => {
-    if (!sameConfig(await getMeta('syncConfig'), cfg)) throw CANCELLED // 其他标签页已关闭/切换备份
+    if (!(await configMatches(cfg, configRev))) throw CANCELLED // 其他标签页已关闭/切换备份
     const local = await db.sessions.toArray()
     const { merged, toLocal, remoteChanged } = mergeSessions(local, parsed?.sessions ?? [])
     if (toLocal.length) await db.sessions.bulkPut(toLocal)
@@ -755,16 +856,16 @@ async function applyRemote(parsed: ParsedBackup | null, cfg: SyncConfig, gen: nu
       plan: { text: needPush ? JSON.stringify(makeBackup(merged, settings, Date.now())) : null, seq: syncMeta.seq ?? 0 },
     }
   })
-  setState({ sessions: result.merged, settings: result.settings })
+  setState({ sessions: result.merged, settings: settingsView(result.settings) })
   if (result.changed) notifyOtherTabs()
   return result.plan
 }
 
 /** 完成：只有期间没有新的本地改动（序号不变）才清除待同步标记。返回是否已干净 */
-async function finishSync(seq: number, cfg: SyncConfig, gen: number): Promise<boolean> {
+async function finishSync(seq: number, cfg: SyncConfig, configRev: number, gen: number): Promise<boolean> {
   if (gen !== syncGen) throw CANCELLED
   const meta = await rwTx(async () => {
-    if (!sameConfig(await getMeta('syncConfig'), cfg)) throw CANCELLED
+    if (!(await configMatches(cfg, configRev))) throw CANCELLED
     const cur = { ...EMPTY_SYNC_META, ...((await getMeta('syncMeta')) ?? {}) }
     const next: SyncMeta = { ...cur, lastSyncAt: Date.now(), dirty: (cur.seq ?? 0) !== seq, lastError: null }
     await setMeta('syncMeta', next)
@@ -775,9 +876,10 @@ async function finishSync(seq: number, cfg: SyncConfig, gen: number): Promise<bo
   return !meta.dirty
 }
 
-async function recordSyncError(msg: string, gen: number, status: SyncStatus) {
+async function recordSyncError(msg: string, gen: number, status: SyncStatus, cfg: SyncConfig, configRev: number) {
   if (gen !== syncGen) return
   const meta = await rwTx(async () => {
+    if (!(await configMatches(cfg, configRev))) throw CANCELLED
     const cur = { ...EMPTY_SYNC_META, ...((await getMeta('syncMeta')) ?? {}) }
     const next: SyncMeta = { ...cur, lastError: msg } // 保留 dirty：失败后仍待同步
     await setMeta('syncMeta', next)
@@ -790,9 +892,17 @@ async function recordSyncError(msg: string, gen: number, status: SyncStatus) {
 // ---------- 全局事件 ----------
 
 export function installGlobalListeners() {
+  const flushPending = () => {
+    if (syncTimer !== undefined && retryTimer === undefined) void syncNow()
+  }
+  window.addEventListener('pagehide', flushPending)
   document.addEventListener('visibilitychange', () => {
     if (document.visibilityState === 'visible') {
+      // 服务器要求的等待（Retry-After）由 syncNow 内部的 retryNotBefore 把关；
+      // 普通网络失败的退避不需要保留：后台会冻结定时器，回到前台应立即重试。
       void reloadFromDb().then(() => (state.sync.dirty ? syncNow() : syncNow({ throttle: true })))
+    } else {
+      flushPending()
     }
   })
   window.addEventListener('online', () => {
