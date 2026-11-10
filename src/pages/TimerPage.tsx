@@ -42,6 +42,9 @@ export function TimerPage() {
   const color = subject?.color ?? THEME_GREEN
   const ms = active ? elapsed(active, now) : 0
   const state = !active ? 'idle' : running ? 'running' : 'paused'
+  // 模拟测试：面板改成整场考试的倒计时，到点只提醒、不自动结束
+  const examMs = (subject?.examMinutes ?? 0) * 60000
+  const over = !!active && examMs > 0 && ms >= examMs
 
   const onPick = (id: string) => {
     if (active) {
@@ -59,7 +62,7 @@ export function TimerPage() {
         <Stat label="今日已学" value={formatDuration(todayTotal)} color={active ? color : THEME_GREEN} />
       </header>
 
-      <section className="card timer c mt-3" style={tint(color)} data-state={state}>
+      <section className="card timer c mt-3" style={tint(color)} data-state={state} data-over={over ? '' : undefined}>
         <div className="timer-head">
           <span className="prompt">
             {subject ? subject.name : '选择一个科目'}
@@ -67,16 +70,16 @@ export function TimerPage() {
           </span>
           <span className="status">
             <span className="dot" />
-            {state === 'running' ? '专注中' : state === 'paused' ? '已暂停' : '待开始'}
+            {state === 'paused' ? '已暂停' : state === 'idle' ? '待开始' : over ? '已超时' : examMs ? '考试中' : '专注中'}
           </span>
         </div>
 
-        <TimerDisplay ms={ms} active={!!active} skin={skin} />
+        <TimerDisplay ms={ms} active={!!active} skin={skin} examMs={examMs} />
 
         <div className="timer-controls" data-active={active ? '' : undefined}>
           {!active ? (
             <Button className="btn-lg" disabled={!selected} onClick={() => selected && selectSubjectAndStart(selected)}>
-              <IconPlay size={18} /> 开始
+              <IconPlay size={18} /> {examMs ? '开始考试' : '开始'}
             </Button>
           ) : (
             <>

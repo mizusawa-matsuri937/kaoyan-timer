@@ -826,6 +826,15 @@ code {
   .timer[data-state='idle'] .timer-digits .sec {
     color: inherit;
   }
+  /* 模拟测试超时：数字显示超出的时长，整体标红 */
+  .timer[data-over] .timer-digits,
+  .timer[data-over] .timer-digits .sec,
+  .timer[data-over] .status {
+    color: var(--danger);
+  }
+  .timer[data-over] .status .dot {
+    background: var(--danger);
+  }
 
   .segbar {
     display: grid;

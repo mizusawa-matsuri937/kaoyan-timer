@@ -7,6 +7,7 @@ import { UpdatePrompt } from './components/UpdatePrompt'
 import { HeatmapPage } from './pages/HeatmapPage'
 import { SettingsPage } from './pages/SettingsPage'
 import { TimerPage } from './pages/TimerPage'
+import { useExamAlarm } from './hooks/useExamAlarm'
 import { useApp } from './store'
 
 // 图表库较大，按需加载
@@ -43,6 +44,7 @@ export function App() {
   const fatal = useApp((s) => s.fatal)
   const running = useApp((s) => !!s.active && s.active.runningSince !== null)
   const [tab, setTab] = useState<TabId>(loadTab)
+  useExamAlarm()
   // 页面切走后不卸载，各自的纵向滚动位置也要记住（所有页面共用 window 的滚动条）
   const scrollTops = useRef<Partial<Record<TabId, number>>>({})
 

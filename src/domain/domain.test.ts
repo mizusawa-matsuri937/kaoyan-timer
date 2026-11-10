@@ -17,6 +17,7 @@ import { formatDuration, formatHMS } from './format'
 import {
   acknowledgeOvertime,
   elapsed,
+  examTimeLeft,
   finishTimer,
   finishTimerAt,
   finishTimerDiscardingRunning,
@@ -239,5 +240,47 @@ describe('日期与格式化', () => {
     expect(formatHMS(3723000)).toBe('01:02:03')
     expect(formatDuration(5 * HOUR + 32 * MIN)).toBe('5h 32m')
     expect(formatDuration(32 * MIN + 59000)).toBe('32m')
+  })
+})
+
+describe('模拟测试', () => {
+  const EXAM = 180 * 60000
+
+  it('每个科目组各有一个限时 180 分钟的模拟测试项，时长计入所在的组', async () => {
+    const { GROUPS, subjectsOf } = await import('./subjects')
+    for (const g of GROUPS) {
+      const mocks = subjectsOf(g.id).filter((s) => s.examMinutes)
+      expect(mocks).toHaveLength(1)
+      expect(mocks[0].examMinutes).toBe(180)
+      expect(subjectsOf(g.id).at(-1)).toBe(mocks[0])
+    }
+    expect(groupTotals({ ds: HOUR, 'mock-408': 3 * HOUR, 'mock-politics': HOUR })).toEqual({
+      cs408: 4 * HOUR,
+      math: 0,
+      english: 0,
+      politics: HOUR,
+    })
+  })
+
+  it('同步和导入的校验认识模拟测试的科目 id', async () => {
+    const { checkSession } = await import('../sync/merge')
+    const r = checkSession({ id: 'a', subjectId: 'mock-408', updatedAt: 1, segments: [{ start: 1000, end: 2000 }] })
+    expect(r.ok).toBe(true)
+  })
+
+  it('examTimeLeft：只有正在跑且还没到点时才返回剩余时间', () => {
+    const t0 = 1_700_000_000_000
+    const running = startTimer('mock-408', t0)
+    expect(examTimeLeft(running, EXAM, t0)).toBe(EXAM)
+    expect(examTimeLeft(running, EXAM, t0 + HOUR)).toBe(2 * HOUR)
+    expect(examTimeLeft(running, EXAM, t0 + EXAM)).toBeNull()
+    expect(examTimeLeft(running, EXAM, t0 + EXAM + 1)).toBeNull()
+    expect(examTimeLeft(running, 0, t0)).toBeNull()
+    expect(examTimeLeft(null, EXAM, t0)).toBeNull()
+    // 暂停期间不提醒；继续后只算实际用掉的时间
+    const paused = pauseTimer(running, t0 + HOUR)
+    expect(examTimeLeft(paused, EXAM, t0 + 2 * HOUR)).toBeNull()
+    const resumed = resumeTimer(paused, t0 + 2 * HOUR)
+    expect(examTimeLeft(resumed, EXAM, t0 + 2 * HOUR + 60000)).toBe(2 * HOUR - 60000)
   })
 })

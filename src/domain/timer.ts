@@ -46,6 +46,16 @@ export function elapsed(t: ActiveTimer, now: number): number {
   return total
 }
 
+/**
+ * 模拟测试还剩多少毫秒到点；不需要安排提醒时返回 null
+ * （没在计时、暂停中、不是限时科目，或者已经超时）。
+ */
+export function examTimeLeft(t: ActiveTimer | null, examMs: number, now: number): number | null {
+  if (!t || t.runningSince === null || examMs <= 0) return null
+  const left = examMs - elapsed(t, now)
+  return left > 0 ? left : null
+}
+
 /** 把计时器的全部段（含正在跑的段，截止到 now）取出来，用于实时统计 */
 export function liveSegments(t: ActiveTimer, now: number): Segment[] {
   return closeRunning(t, now)

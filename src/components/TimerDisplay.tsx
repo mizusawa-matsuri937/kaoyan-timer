@@ -45,19 +45,45 @@ const RING: Record<Exclude<SkinId, 'terminal'>, { width: number; edge: boolean }
 /**
  * 计时主体，形态跟随皮肤：
  * 终端极客 = 大数字 + 分格进度条；新粗野 / 纸感文艺 = 圆环。每满一行 / 一圈 = 1 小时。
+ *
+ * 传入 examMs（模拟测试）时改成倒计时：数字显示剩余时间，一行 / 一圈 = 整场考试；
+ * 时间用完后数字变成超出的时长，由外层的 data-over 标红。
  */
-export function TimerDisplay({ ms, active, skin }: { ms: number; active: boolean; skin: SkinId }) {
-  const lap = Math.floor(ms / HOUR)
-  const progress = (ms % HOUR) / HOUR
+export function TimerDisplay({
+  ms,
+  active,
+  skin,
+  examMs = 0,
+}: {
+  ms: number
+  active: boolean
+  skin: SkinId
+  examMs?: number
+}) {
+  const exam = examMs > 0
+  const span = exam ? examMs : HOUR
+  const lap = exam ? 0 : Math.floor(ms / HOUR)
+  const over = exam && ms >= examMs
+  const progress = exam ? Math.min(1, ms / examMs) : (ms % HOUR) / HOUR
+  // 倒计时向上取整到秒：刚开始显示 03:00:00，而不是立刻跳到 02:59:59
+  const shown = !exam ? ms : over ? ms - examMs : Math.ceil((examMs - ms) / 1000) * 1000
+  const examMinutes = Math.round(examMs / 60000)
 
   if (skin === 'terminal') {
+    const caption = exam
+      ? active
+        ? `${over ? '已超时' : '已用'} ${formatHMS(over ? ms - examMs : ms)} · ${Math.floor(progress * 100)}%`
+        : `模拟考试 · 满格 = ${examMinutes} 分钟`
+      : active
+        ? `第 ${lap + 1} 小时 · ${Math.floor(progress * 100)}%`
+        : '每满一行 = 1 小时'
     return (
       <>
-        <Digits ms={ms} />
-        <SegBar on={Math.floor(progress * SEGS)} showNow={active} />
+        <Digits ms={shown} />
+        <SegBar on={Math.floor(progress * SEGS)} showNow={active && !over} />
         <div className="timer-caption">
-          <span className="num">{active ? `第 ${lap + 1} 小时 · ${Math.floor(progress * 100)}%` : '每满一行 = 1 小时'}</span>
-          <span>每格 2 分钟</span>
+          <span className="num">{caption}</span>
+          <span>每格 {Math.round(span / SEGS / 60000)} 分钟</span>
         </div>
       </>
     )
@@ -66,6 +92,13 @@ export function TimerDisplay({ ms, active, skin }: { ms: number; active: boolean
   const { width, edge } = RING[skin]
   // svg 整体旋转 -90°，所以 0° 在顶部
   const theta = progress * 2 * Math.PI
+  const caption = exam
+    ? active
+      ? `${over ? '已超时' : '已用'} ${formatHMS(over ? ms - examMs : ms)}`
+      : `模拟考试 · ${examMinutes} 分钟`
+    : active
+      ? `第 ${lap + 1} 小时`
+      : '每圈 1 小时'
   return (
     <div className="dial">
       <svg viewBox="0 0 200 200" aria-hidden>
@@ -92,9 +125,9 @@ export function TimerDisplay({ ms, active, skin }: { ms: number; active: boolean
         )}
       </svg>
       <div className="dial-center">
-        <Digits ms={ms} />
+        <Digits ms={shown} />
         <div className="timer-caption">
-          <span className="num">{active ? `第 ${lap + 1} 小时` : '每圈 1 小时'}</span>
+          <span className="num">{caption}</span>
         </div>
       </div>
     </div>
