@@ -1,6 +1,4 @@
-import { motion } from 'framer-motion'
 import { lazy, Suspense, useEffect, useState } from 'react'
-import { AmbientGlow } from './components/AmbientGlow'
 import { ErrorBoundary } from './components/ErrorBoundary'
 import { OvertimeDialog } from './components/OvertimeDialog'
 import { TabBar, type TabId } from './components/TabBar'
@@ -60,23 +58,17 @@ export function App() {
 
   return (
     <div className="mx-auto min-h-full max-w-lg safe-top" style={{ paddingBottom: 'calc(env(safe-area-inset-bottom) + 96px)' }}>
-      <AmbientGlow tab={tab} />
       <ErrorBoundary resetKey={tab}>
-        <motion.main
-            key={tab}
-            initial={{ opacity: 0.4, y: 6 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ duration: 0.18, ease: 'easeOut' }}
-          >
-            {tab === 'timer' && <TimerPage />}
-            {tab === 'heat' && <HeatmapPage />}
-            {tab === 'stats' && (
-              <Suspense fallback={<div className="p-8 text-center text-sm text-muted">加载中…</div>}>
-                <StatsPage />
-              </Suspense>
-            )}
-            {tab === 'settings' && <SettingsPage />}
-          </motion.main>
+        <main key={tab} className="page-in">
+          {tab === 'timer' && <TimerPage />}
+          {tab === 'heat' && <HeatmapPage />}
+          {tab === 'stats' && (
+            <Suspense fallback={<div className="p-8 text-center text-sm text-muted">加载中…</div>}>
+              <StatsPage />
+            </Suspense>
+          )}
+          {tab === 'settings' && <SettingsPage />}
+        </main>
       </ErrorBoundary>
       <TabBar tab={tab} onChange={setTab} running={running} />
       <OvertimeDialog />

@@ -4,9 +4,9 @@ import { formatClock, formatDayCN } from '../domain/dates'
 import { formatDuration, formatDurationCN } from '../domain/format'
 import { SUBJECTS, getSubject } from '../domain/subjects'
 import type { Session } from '../domain/types'
-import { HEAT_GLOWS, HEAT_VARS } from './Heatmap'
+import { HEAT_VARS } from './Heatmap'
 import { IconChevron, IconPlus } from './icons'
-import { GlowBar, Sheet } from './ui'
+import { Bar, Sheet, tint } from './ui'
 
 export function DaySheet({
   day,
@@ -38,10 +38,10 @@ export function DaySheet({
     <Sheet open={!!day} onClose={onClose} title={day ? formatDayCN(day) : ''}>
       {day && (
         <>
-          <div className="glass-flat flex items-center gap-3 rounded-2xl p-4">
-            <span className="h-9 w-9 rounded-xl" style={{ background: HEAT_VARS[lvl], boxShadow: HEAT_GLOWS[lvl] }} />
+          <div className="well flex items-center gap-3 p-4">
+            <span className="heat-cell h-9 w-9 shrink-0" style={{ background: HEAT_VARS[lvl] }} />
             <div>
-              <div className="num text-2xl font-bold">{formatDurationCN(total)}</div>
+              <div className="num text-2xl font-semibold">{formatDurationCN(total)}</div>
               <div className="text-xs text-muted">等级：{LEVEL_LABELS[lvl]}</div>
             </div>
           </div>
@@ -54,22 +54,22 @@ export function DaySheet({
                     <span className="font-medium">{s.name}</span>
                     <span className="num text-muted">{formatDuration(ms)}</span>
                   </div>
-                  <GlowBar pct={(ms / max) * 100} color={s.color} />
+                  <Bar pct={(ms / max) * 100} color={s.color} />
                 </div>
               ))}
             </div>
           )}
 
           <div className="mt-6 mb-2 flex items-center justify-between">
-            <span className="text-[13px] font-semibold text-muted">学习记录（{sessions.length}）</span>
+            <span className="section-title">学习记录（{sessions.length}）</span>
             <button onClick={() => onAdd(day)} className="flex items-center gap-0.5 text-sm font-semibold text-accent">
               <IconPlus size={16} /> 补录
             </button>
           </div>
           {sessions.length === 0 ? (
-            <div className="rounded-2xl bg-card-2 py-8 text-center text-sm text-muted">这天没有记录</div>
+            <div className="well py-8 text-center text-sm text-muted">这天没有记录</div>
           ) : (
-            <div className="divide-y overflow-hidden rounded-2xl bg-card-2" style={{ borderColor: 'var(--line)' }}>
+            <div className="well rows overflow-hidden">
               {sessions.map((s) => {
                 const sub = getSubject(s.subjectId)
                 const first = s.segments[0]
@@ -82,15 +82,15 @@ export function DaySheet({
                   <button
                     key={s.id}
                     onClick={() => onEdit(s)}
-                    className="flex w-full items-center gap-3 px-4 py-3 text-left active:bg-card"
-                    style={{ borderColor: 'var(--line)' }}
+                    className="c flex w-full items-center gap-3 px-4 py-3 text-left active:bg-card"
+                    style={sub ? tint(sub.color) : undefined}
                   >
-                    <span className="h-8 w-1.5 shrink-0 rounded-full" style={{ background: sub?.color }} />
+                    <span className="dot" style={{ width: 6, height: 32, borderRadius: 3 }} />
                     <div className="min-w-0 flex-1">
                       <div className="flex items-center gap-1.5 text-[15px] font-medium">
                         {sub?.name ?? s.subjectId}
                         {s.source === 'manual' && (
-                          <span className="rounded-md bg-card px-1.5 py-0.5 text-[10px] text-muted">补录</span>
+                          <span className="rounded-md border border-line bg-card px-1.5 py-0.5 text-[10px] text-muted">补录</span>
                         )}
                       </div>
                       <div className="num text-xs text-muted">

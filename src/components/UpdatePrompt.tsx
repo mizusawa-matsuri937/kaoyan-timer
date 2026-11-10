@@ -21,17 +21,13 @@ export function UpdatePrompt() {
           animate={{ y: 0, opacity: 1 }}
           exit={{ y: 40, opacity: 0 }}
           className="card fixed inset-x-4 z-50 mx-auto flex max-w-md items-center gap-3 p-3 pl-4"
-          style={{ bottom: 'calc(env(safe-area-inset-bottom) + 92px)' }}
+          style={{ bottom: 'calc(env(safe-area-inset-bottom) + 92px)', boxShadow: 'var(--shadow-pop)' }}
         >
           <span className="flex-1 text-sm">有新版本可用</span>
           <button className="text-sm text-muted" onClick={() => setNeedRefresh(false)}>
             稍后
           </button>
-          <button
-            className="rounded-xl px-3 py-1.5 text-sm font-semibold text-white"
-            style={{ background: 'var(--accent)' }}
-            onClick={() => void updateServiceWorker(true)}
-          >
+          <button className="btn btn-primary !px-3 !py-1.5 text-sm" onClick={() => void updateServiceWorker(true)}>
             更新
           </button>
         </motion.div>

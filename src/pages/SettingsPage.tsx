@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState, type ReactNode } from 'react'
 import { IconCloud } from '../components/icons'
+import { SkinPicker } from '../components/SkinPicker'
 import { Button, SectionTitle } from '../components/ui'
 import { dayKey } from '../domain/dates'
 import { wakeLockSupported } from '../hooks/useWakeLock'
@@ -16,7 +17,7 @@ import {
 
 function Row({ label, children, hint }: { label: string; children: ReactNode; hint?: string }) {
   return (
-    <div className="flex items-center justify-between gap-3 py-3" style={{ borderColor: 'var(--line)' }}>
+    <div className="flex items-center justify-between gap-3 py-3">
       <div>
         <div className="text-[15px]">{label}</div>
         {hint && <div className="text-xs text-muted">{hint}</div>}
@@ -28,18 +29,7 @@ function Row({ label, children, hint }: { label: string; children: ReactNode; hi
 
 function Toggle({ on, onChange }: { on: boolean; onChange: (v: boolean) => void }) {
   return (
-    <button
-      role="switch"
-      aria-checked={on}
-      onClick={() => onChange(!on)}
-      className="relative h-[31px] w-[51px] rounded-full transition-colors"
-      style={{ background: on ? 'var(--accent)' : 'var(--card-2)' }}
-    >
-      <span
-        className="absolute top-[2px] left-[2px] h-[27px] w-[27px] rounded-full bg-white shadow transition-transform"
-        style={{ transform: on ? 'translateX(20px)' : 'none' }}
-      />
-    </button>
+    <button role="switch" aria-checked={on} onClick={() => onChange(!on)} className="toggle" />
   )
 }
 
@@ -121,17 +111,21 @@ export function SettingsPage() {
 
   return (
     <div className="px-4 pb-8">
-      <h1 className="pt-2 text-[28px] font-bold">设置</h1>
+      <h1 className="page-title">设置</h1>
 
       {!isStandalone && (
-        <div className="card mt-3 p-4 text-sm leading-relaxed" style={{ background: 'var(--accent-soft)', boxShadow: 'none' }}>
+        <div className="note mt-3 p-4 text-sm leading-relaxed">
           <b>建议添加到主屏幕使用：</b>在 Safari 中点「分享」→「添加到主屏幕」，之后都从主屏幕图标打开。
           主屏幕 App 的数据不会被 Safari 自动清理，而且和浏览器标签页里的数据是<b>分开存的</b>。
         </div>
       )}
 
+      <SectionTitle>外观</SectionTitle>
+      <SkinPicker />
+      <p className="mt-2 px-1 text-xs text-faint">外观设置只保存在这台设备上。</p>
+
       <SectionTitle>考研</SectionTitle>
-      <div className="card divide-y px-4" style={{ borderColor: 'var(--line)' }}>
+      <div className="card rows px-4">
         <Row label="初试日期">
           <input
             type="date"
@@ -153,7 +147,7 @@ export function SettingsPage() {
       </div>
 
       <SectionTitle>计时</SectionTitle>
-      <div className="card divide-y px-4" style={{ borderColor: 'var(--line)' }}>
+      <div className="card rows px-4">
         <Row label="忘记结束提醒" hint="单段连续计时超过该时长，回来时询问">
           <select
             className="field !w-auto !py-1.5"
@@ -185,7 +179,7 @@ export function SettingsPage() {
       </SectionTitle>
       <div className="card p-4">
         {cfg && (
-          <div className="mb-4 rounded-2xl bg-card-2 p-3 text-sm">
+          <div className="well mb-4 p-3 text-sm">
             <div className="flex justify-between">
               <span className="text-muted">上次备份</span>
               <span className="num">
@@ -243,7 +237,7 @@ export function SettingsPage() {
       </div>
 
       <SectionTitle>数据</SectionTitle>
-      <div className="card divide-y px-4" style={{ borderColor: 'var(--line)' }}>
+      <div className="card rows px-4">
         <Row label="学习记录" hint={usage ? `本地占用约 ${usage}` : undefined}>
           <span className="num text-muted">{count} 条</span>
         </Row>

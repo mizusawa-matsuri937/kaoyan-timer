@@ -5,7 +5,7 @@ import { SUBJECTS } from '../domain/subjects'
 import type { Session } from '../domain/types'
 import { deleteSession, saveSession, showToast } from '../store'
 import { IconPlus, IconTrash } from './icons'
-import { Button, Sheet } from './ui'
+import { Button, Sheet, tint } from './ui'
 
 const pad = (n: number) => String(n).padStart(2, '0')
 function toInput(ts: number) {
@@ -99,7 +99,7 @@ export function SessionEditor({ target, onClose }: { target: EditorTarget; onClo
 
   return (
     <Sheet open={!!target} onClose={close} title={target?.kind === 'edit' ? '修改记录' : '补录学习时间'}>
-      <div className="mb-2 text-[13px] font-semibold text-muted">科目</div>
+      <div className="section-title mb-2">科目</div>
       <div className="flex flex-wrap gap-2">
         {SUBJECTS.map((s) => {
           const on = s.id === subjectId
@@ -107,11 +107,9 @@ export function SessionEditor({ target, onClose }: { target: EditorTarget; onClo
             <button
               key={s.id}
               onClick={() => setSubjectId(s.id)}
-              className="rounded-full px-3 py-1.5 text-sm font-medium transition-colors"
-              style={{
-                background: on ? s.color : 'var(--card-2)',
-                color: on ? '#fff' : 'var(--text)',
-              }}
+              aria-pressed={on}
+              className="chip c"
+              style={tint(s.color)}
             >
               {s.name}
             </button>
@@ -120,12 +118,12 @@ export function SessionEditor({ target, onClose }: { target: EditorTarget; onClo
       </div>
 
       <div className="mt-5 mb-2 flex items-center justify-between">
-        <span className="text-[13px] font-semibold text-muted">时间段（暂停会分成多段）</span>
+        <span className="section-title">时间段（暂停会分成多段）</span>
         <span className="num text-sm font-semibold">{formatDurationCN(total)}</span>
       </div>
       <div className="space-y-3">
         {rows.map((r, i) => (
-          <div key={i} className="rounded-2xl bg-card-2 p-3">
+          <div key={i} className="well p-3">
             <div className="mb-2 flex items-center justify-between text-xs text-muted">
               <span>第 {i + 1} 段</span>
               {rows.length > 1 && (
@@ -160,7 +158,7 @@ export function SessionEditor({ target, onClose }: { target: EditorTarget; onClo
             setRows([...rows, { start: toInput(start), end: toInput(start + 3600000) }])
           }}
           className="flex w-full items-center justify-center gap-1 rounded-2xl border border-dashed py-2.5 text-sm text-muted"
-          style={{ borderColor: 'var(--line)' }}
+          style={{ borderColor: 'var(--border)' }}
         >
           <IconPlus size={16} /> 添加一段
         </button>

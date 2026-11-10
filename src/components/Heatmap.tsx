@@ -10,7 +10,6 @@ const LABEL_W = 18
 const TOP = 18
 
 export const HEAT_VARS = ['var(--h0)', 'var(--h1)', 'var(--h2)', 'var(--h3)', 'var(--h4)']
-export const HEAT_GLOWS = [undefined, undefined, undefined, '0 0 6px var(--h3-glow)', '0 0 10px var(--h4-glow)']
 
 interface Props {
   daily: Daily
@@ -73,15 +72,14 @@ export const Heatmap = memo(function Heatmap({ daily, from, to, today, selected,
           key={day}
           onClick={() => !future && onSelect(day)}
           aria-label={day}
-          className="absolute rounded-[4px] transition-transform active:scale-90"
+          className="heat-cell absolute transition-transform active:scale-90"
           style={{
             left: LEFT + c * STEP,
             top: TOP + r * STEP,
             width: CELL,
             height: CELL,
             background: future ? 'transparent' : HEAT_VARS[lvl],
-            border: future ? '1px dashed var(--line)' : undefined,
-            boxShadow: lvl === 4 && !future ? '0 0 8px var(--h4-glow)' : lvl === 3 && !future ? '0 0 5px var(--h3-glow)' : undefined,
+            border: future ? '1px solid var(--line)' : undefined,
             outline: isSel ? '2px solid var(--text)' : isToday ? '1.5px solid var(--accent)' : undefined,
             outlineOffset: 1,
             cursor: future ? 'default' : 'pointer',
@@ -127,7 +125,7 @@ export function HeatLegend() {
     <div className="flex items-center gap-1 text-[11px] text-muted">
       <span className="mr-1">少</span>
       {HEAT_VARS.map((c, i) => (
-        <span key={i} className="inline-block rounded-[3px]" style={{ width: 11, height: 11, background: c }} />
+        <span key={i} className="heat-cell inline-block" style={{ width: 11, height: 11, background: c }} />
       ))}
       <span className="ml-1">多</span>
     </div>
