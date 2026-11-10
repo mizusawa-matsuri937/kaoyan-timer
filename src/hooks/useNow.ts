@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useLayoutEffect, useState } from 'react'
 
 /**
  * 当前时间，按秒（或分钟）对齐刷新。
@@ -6,8 +6,16 @@ import { useEffect, useState } from 'react'
  */
 export function useNow(unit: 'second' | 'minute' = 'second'): number {
   const [now, setNow] = useState(() => Date.now())
+  const step = unit === 'second' ? 1000 : 60000
+  // 页面切走时不卸载、定时器是停的，切回来（副作用重新挂上）时先把时间对上再画，
+  // 否则要等到下一次整秒 / 整分才刷新，会先看到一眼旧数据
+  useLayoutEffect(() => {
+    setNow((prev) => {
+      const t = Date.now()
+      return Math.floor(prev / step) === Math.floor(t / step) ? prev : t
+    })
+  }, [step])
   useEffect(() => {
-    const step = unit === 'second' ? 1000 : 60000
     let timer: ReturnType<typeof setTimeout>
     const tick = () => {
       const t = Date.now()
@@ -28,6 +36,6 @@ export function useNow(unit: 'second' | 'minute' = 'second'): number {
       document.removeEventListener('visibilitychange', onVis)
       window.removeEventListener('focus', onVis)
     }
-  }, [unit])
+  }, [step])
   return now
 }
