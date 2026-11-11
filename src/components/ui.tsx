@@ -1,5 +1,5 @@
 import { AnimatePresence, motion, useDragControls } from 'framer-motion'
-import { useEffect, type CSSProperties, type ReactNode } from 'react'
+import { useEffect, type CSSProperties, type InputHTMLAttributes, type ReactNode } from 'react'
 import { useApp } from '../store'
 
 /** 把科目色交给 CSS：配合 .c 类，由当前皮肤决定怎么用这个颜色 */
@@ -107,6 +107,19 @@ export function Button({
     <button type={type} onClick={onClick} disabled={disabled} className={`btn btn-${variant} ${className}`}>
       {children}
     </button>
+  )
+}
+
+/**
+ * 占满一行的日期时间输入框。
+ * iOS Safari 的原生日期输入框不按 border-box 算宽度，直接给它 width:100% 加内边距会超出容器，
+ * 所以边框和内边距交给外层 label，输入框本身零内边距、零边框，怎么算都是同一个宽度。
+ */
+export function DateTimeField({ className = '', ...props }: Omit<InputHTMLAttributes<HTMLInputElement>, 'type'>) {
+  return (
+    <label className={`field field-box ${className}`}>
+      <input type="datetime-local" {...props} />
+    </label>
   )
 }
 

@@ -460,6 +460,33 @@ code {
   .field::placeholder {
     color: var(--faint);
   }
+  /* 外层负责边框和内边距、输入框本身不带任何盒子：见 ui.tsx 的 DateTimeField */
+  .field-box {
+    display: block;
+    min-width: 0;
+    overflow: hidden;
+    cursor: text;
+  }
+  .field-box:focus-within {
+    border-color: var(--accent);
+    box-shadow: 0 0 0 3px var(--accent-soft);
+  }
+  .field-box > input {
+    display: block;
+    width: 100%;
+    min-width: 0;
+    min-height: 1.5em; /* 去掉原生外观后，iOS 上空值会塌成 0 高 */
+    padding: 0;
+    border: 0;
+    border-radius: 0;
+    background: transparent;
+    outline: none;
+    -webkit-appearance: none;
+    appearance: none;
+  }
+  .field-box > input::-webkit-date-and-time-value {
+    text-align: left; /* iOS 去掉原生外观后默认居中 */
+  }
 
   .toggle {
     position: relative;

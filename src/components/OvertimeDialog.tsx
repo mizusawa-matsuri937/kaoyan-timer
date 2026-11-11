@@ -3,7 +3,7 @@ import { formatDurationCN } from '../domain/format'
 import { getSubject } from '../domain/subjects'
 import { isOvertime } from '../domain/timer'
 import { overtimeMs, resolveOvertime, showToast, useApp, type OvertimeChoice } from '../store'
-import { Button, Sheet } from './ui'
+import { Button, DateTimeField, Sheet } from './ui'
 
 const pad = (n: number) => String(n).padStart(2, '0')
 function toLocalInput(ts: number) {
@@ -101,9 +101,7 @@ export function OvertimeDialog() {
       ) : (
         <div className="grid gap-3">
           <label className="text-sm text-muted">实际结束时间</label>
-          <input
-            type="datetime-local"
-            className="field"
+          <DateTimeField
             value={endInput}
             min={toLocalInput(since)}
             max={toLocalInput(snapshotNow)}

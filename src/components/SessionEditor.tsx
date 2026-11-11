@@ -5,7 +5,7 @@ import { SUBJECTS } from '../domain/subjects'
 import type { Session } from '../domain/types'
 import { deleteSession, saveSession, showToast } from '../store'
 import { IconPlus, IconTrash } from './icons'
-import { Button, Sheet, tint } from './ui'
+import { Button, DateTimeField, Sheet, tint } from './ui'
 
 const pad = (n: number) => String(n).padStart(2, '0')
 function toInput(ts: number) {
@@ -132,18 +132,16 @@ export function SessionEditor({ target, onClose }: { target: EditorTarget; onClo
                 </button>
               )}
             </div>
-            <div className="grid grid-cols-[2.5rem_1fr] items-center gap-2 text-sm">
+            <div className="grid grid-cols-[2.5rem_minmax(0,1fr)] items-center gap-2 text-sm">
               <span className="text-muted">开始</span>
-              <input
-                type="datetime-local"
-                className="field !bg-card"
+              <DateTimeField
+                className="!bg-card"
                 value={r.start}
                 onChange={(e) => setRows(rows.map((x, j) => (j === i ? { ...x, start: e.target.value } : x)))}
               />
               <span className="text-muted">结束</span>
-              <input
-                type="datetime-local"
-                className="field !bg-card"
+              <DateTimeField
+                className="!bg-card"
                 value={r.end}
                 onChange={(e) => setRows(rows.map((x, j) => (j === i ? { ...x, end: e.target.value } : x)))}
               />
