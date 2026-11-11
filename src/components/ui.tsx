@@ -149,7 +149,7 @@ export function ToastHost() {
 
 export function SectionTitle({ children, right }: { children: ReactNode; right?: ReactNode }) {
   return (
-    <div className="mt-6 mb-2 flex items-center justify-between px-1">
+    <div className="sec-head">
       <h2 className="section-title">{children}</h2>
       {right}
     </div>

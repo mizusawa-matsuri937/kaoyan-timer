@@ -59,7 +59,7 @@ export function StatsPage() {
 
       <div className="card mt-3 p-4">
         <div>
-          <div className="text-xs text-muted">考研总学习时长</div>
+          <div className="card-legend">考研总学习时长</div>
           <div className="num mt-1 text-[38px] leading-tight font-semibold">
             {hours1(total)}
             <span className="ml-1.5 text-base font-medium text-muted">小时</span>

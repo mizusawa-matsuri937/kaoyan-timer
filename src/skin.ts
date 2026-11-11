@@ -28,7 +28,7 @@ const DARK_QUERY = '(prefers-color-scheme: dark)'
 
 /** 浏览器状态栏颜色，与各皮肤的 --bg 保持一致 */
 const THEME_COLOR: Record<SkinId, { light: string; dark: string }> = {
-  terminal: { light: '#f6f8fa', dark: '#0d1117' },
+  terminal: { light: '#ffffff', dark: '#0d1117' },
   brutal: { light: '#fff4d6', dark: '#25262f' },
   paper: { light: '#f5f0e6', dark: '#1a1816' },
 }
