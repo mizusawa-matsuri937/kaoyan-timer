@@ -19,7 +19,7 @@ export function SubjectGrid({
   onPick: (id: string) => void
 }) {
   return (
-    <div className="space-y-5">
+    <div className="subj-groups mt-6 space-y-5">
       {GROUPS.map((g) => {
         const subs = subjectsOf(g.id)
         const groupMs = subs.reduce((a, s) => a + (todayBySubject[s.id] ?? 0), 0)

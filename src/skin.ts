@@ -1,4 +1,5 @@
 import { useSyncExternalStore } from 'react'
+import { flushSync } from 'react-dom'
 
 /**
  * 外观：皮肤 + 明暗模式。纯外观偏好，只存在本机 localStorage，不进数据库也不参与同步。
@@ -72,6 +73,39 @@ function commit() {
   for (const l of listeners) l()
 }
 
+let vtSeq = 0
+
+/**
+ * 用户自己换皮肤 / 明暗时，带一段整屏过渡（View Transitions：前后两帧是浏览器截的图，过渡期间页面不重排）。
+ * 用哪种过渡由 CSS 令牌 --m-vt 决定（见 motion.css）；浏览器不支持、令牌是 none、或系统开了减弱动态效果时直接切换。
+ */
+function commitAnimated() {
+  const root = document.documentElement
+  const kind = () => getComputedStyle(root).getPropertyValue('--m-vt').trim()
+  if (
+    typeof document.startViewTransition !== 'function' ||
+    !kind() ||
+    kind() === 'none' ||
+    window.matchMedia('(prefers-reduced-motion: reduce)').matches
+  ) {
+    commit()
+    return
+  }
+  const vt = document.startViewTransition(() => {
+    // 新画面要在这个回调里同步画完，所以让 React 立刻提交
+    flushSync(commit)
+    // 换完再读一次：过渡的样式跟随「换成的」那套皮肤
+    root.dataset.vt = kind()
+  })
+  // 过渡还没播完又换了一次时，前一次会被浏览器跳过：不算错误，也别把后一次的标记清掉
+  const seq = ++vtSeq
+  const done = () => {
+    if (seq === vtSeq) delete root.dataset.vt
+  }
+  vt.ready.catch(() => {})
+  vt.finished.then(done, done)
+}
+
 /** 启动时调用一次：应用外观，并跟随系统明暗变化和其他标签页的切换 */
 export function initSkin() {
   apply()
@@ -105,14 +139,14 @@ export function setSkin(next: SkinId) {
   if (next === skin) return
   skin = next
   write(SKIN_KEY, next)
-  commit()
+  commitAnimated()
 }
 
 export function setMode(next: ModeId) {
   if (next === mode) return
   mode = next
   write(MODE_KEY, next)
-  commit()
+  commitAnimated()
 }
 
 const subscribe = (cb: () => void) => {

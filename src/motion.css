@@ -1,0 +1,334 @@
+/* =====================================================================
+   动效
+   所有入场 / 切换类的动画都在这里，由一组 --m-* 令牌驱动；每套皮肤一种动法。
+   原则：只动 transform 和 opacity（交给合成层），不碰布局；终端皮肤里少数几处用了
+   分步的 clip-path——一次动画只重画几帧。动画一律只写 from、用 backwards 填充，
+   播完不留任何 transform，也就不会多出合成层或影响 fixed 定位。
+   系统开了「减弱动态效果」时，index.css 末尾的规则会把这里全部关掉。
+
+   令牌挂在 <html> 上（不像配色那样支持局部 data-skin）：设置页的皮肤预览小块不需要动效。
+   ===================================================================== */
+
+/* 只有个别皮肤才用到的令牌，这里给默认值 */
+:root {
+  --m-rise: 8px; /* m-rise 上浮的距离 */
+  --m-bar-w-ease: ease-out; /* 进度条数值变化 */
+  --m-pick: none; /* 选中科目：标记（圆点 / 提示符） */
+  --m-pick-card: none; /* 选中科目：整块 */
+}
+
+/* ---------- 终端极客：没有缓动，全是分步——像终端一行行重画屏幕 ---------- */
+html[data-skin='terminal'] {
+  --m-enter: m-print; /* 页面里每个区块的入场 */
+  --m-enter-dur: 0.2s;
+  --m-enter-ease: steps(4, jump-none);
+  --m-stagger: 40ms; /* 区块之间依次错开的间隔 */
+  --m-title: m-type; /* 页面标题单独的入场；不定义就跟其他区块一样 */
+  --m-slide-dur: 0.12s; /* 导航指示块、分段控件滑块 */
+  --m-slide-ease: steps(3);
+  --m-digit: m-refresh; /* 计时数字换字 */
+  --m-digit-dur: 0.14s;
+  --m-digit-ease: steps(2, jump-none);
+  --m-bar: m-fill; /* 进度条入场 */
+  --m-bar-dur: 0.36s;
+  --m-bar-ease: steps(9);
+  --m-bar-w-ease: steps(6);
+  --m-heat: m-fill; /* 热度表入场 */
+  --m-heat-dur: 0.4s;
+  --m-heat-ease: steps(12);
+  --m-pick: m-blink;
+  --m-pick-dur: 0.32s;
+  --m-pick-ease: linear;
+  --m-ctl: m-refresh; /* 开始 / 暂停 / 结束按钮换出来 */
+  --m-ring: m-blink; /* 热度表选中框 */
+  --m-vt: scan; /* 换皮肤 / 明暗时的整屏过渡：none | soft | scan | push */
+}
+
+/* ---------- 新粗野：硬、脆、带回弹——卡片从阴影的位置弹出来 ---------- */
+html[data-skin='brutal'] {
+  --m-enter: m-slam;
+  --m-enter-dur: 0.3s;
+  --m-enter-ease: cubic-bezier(0.3, 1.5, 0.5, 1);
+  --m-stagger: 50ms;
+  --m-slide-dur: 0.28s;
+  --m-slide-ease: cubic-bezier(0.3, 1.5, 0.5, 1);
+  --m-digit: m-drop;
+  --m-digit-dur: 0.26s;
+  --m-digit-ease: cubic-bezier(0.3, 1.6, 0.5, 1);
+  --m-bar: m-grow;
+  --m-bar-dur: 0.45s;
+  --m-bar-ease: cubic-bezier(0.3, 1.4, 0.5, 1);
+  --m-heat: m-slide-x;
+  --m-heat-dur: 0.35s;
+  --m-heat-ease: cubic-bezier(0.3, 1.3, 0.5, 1);
+  --m-pick-card: m-punch;
+  --m-pick-dur: 0.26s;
+  --m-pick-ease: cubic-bezier(0.3, 1.8, 0.5, 1);
+  --m-ctl: m-slam;
+  --m-ring: m-ring;
+  --m-vt: push;
+}
+
+/* ---------- 纸感文艺：慢、柔——像墨迹慢慢洇开 ---------- */
+html[data-skin='paper'] {
+  --m-enter: m-rise;
+  --m-rise: 6px;
+  --m-enter-dur: 0.55s;
+  --m-enter-ease: cubic-bezier(0.2, 0.6, 0.2, 1);
+  --m-stagger: 70ms;
+  --m-slide-dur: 0.42s;
+  --m-slide-ease: cubic-bezier(0.3, 0.7, 0.2, 1);
+  --m-digit: m-fade;
+  --m-digit-dur: 0.45s;
+  --m-digit-ease: ease-out;
+  --m-bar: m-grow;
+  --m-bar-dur: 0.9s;
+  --m-bar-ease: cubic-bezier(0.2, 0.6, 0.2, 1);
+  --m-heat: m-fade;
+  --m-heat-dur: 0.6s;
+  --m-heat-ease: ease-out;
+  --m-pick: m-fade;
+  --m-pick-dur: 0.4s;
+  --m-pick-ease: ease-out;
+  --m-ctl: m-fade;
+  --m-ring: m-fade;
+  --m-vt: soft;
+}
+
+/* ===================== 套用 ===================== */
+
+/* 区块入场。隐藏的页面是 display:none，切回来时动画会自动重播，不需要 JS。
+   动的是页面里的各个区块而不是整页：弹层（.overlay）是 fixed 定位，祖先带 transform 的话会被带偏 */
+.page-in > div > :not(.overlay, .subj-groups),
+.subj-groups > section {
+  animation: var(--m-enter) var(--m-enter-dur) var(--m-enter-ease) backwards;
+  animation-delay: calc(var(--m-stagger) * var(--ord, 0));
+}
+.page-in > div > :nth-child(2) {
+  --ord: 1;
+}
+.page-in > div > :nth-child(3) {
+  --ord: 2;
+}
+.page-in > div > :nth-child(4) {
+  --ord: 3;
+}
+.page-in > div > :nth-child(5) {
+  --ord: 4;
+}
+.page-in > div > :nth-child(6) {
+  --ord: 5;
+}
+.page-in > div > :nth-child(7) {
+  --ord: 6;
+}
+.page-in > div > :nth-child(8) {
+  --ord: 7;
+}
+.page-in > div > :nth-child(9) {
+  --ord: 8;
+}
+/* 首屏之外的不再往后排，免得滚下去时还在等 */
+.page-in > div > :nth-child(n + 10) {
+  --ord: 9;
+}
+/* 计时页的科目组接在计时面板后面 */
+.subj-groups > section:nth-child(1) {
+  --ord: 2;
+}
+.subj-groups > section:nth-child(2) {
+  --ord: 3;
+}
+.subj-groups > section:nth-child(3) {
+  --ord: 4;
+}
+.subj-groups > section:nth-child(n + 4) {
+  --ord: 5;
+}
+
+/* 终端皮肤的页面标题：逐字打出来（宽度收到文字那么宽，揭开的进度才和字数对得上） */
+.page-in > div > h1.page-title {
+  animation-name: var(--m-title, var(--m-enter));
+}
+html[data-skin='terminal'] .page-in > div > h1.page-title {
+  width: fit-content;
+  animation-duration: 0.22s;
+  animation-timing-function: steps(7);
+}
+
+/* 计时数字：变了的那一位重新挂载（见 TimerDisplay 的 key），只有它播放 */
+.dial .timer-digits .d,
+.blockdigits path {
+  animation: var(--m-digit) var(--m-digit-dur) var(--m-digit-ease);
+}
+/* 终端皮肤里秒每秒都在跳，不参与刷新闪烁，免得分心 */
+.blockdigits .sec {
+  animation: none;
+}
+
+/* 进度条：入场时从左长出来；之后数值变化走 width 过渡（很少发生，元素也很小） */
+.bar > i {
+  transform-origin: left;
+  transition: width 0.5s var(--m-bar-w-ease);
+  animation: var(--m-bar) var(--m-bar-dur) var(--m-bar-ease) backwards;
+  animation-delay: calc(var(--m-stagger) * var(--ord, 0) + 80ms);
+}
+
+/* 热度表：动的是滚动容器这一个节点，不是几百个格子 */
+.heat-scroll {
+  animation: var(--m-heat) var(--m-heat-dur) var(--m-heat-ease) backwards;
+  animation-delay: calc(var(--m-stagger) * 2);
+}
+.heat-ring {
+  animation: var(--m-ring) 0.24s ease-out;
+}
+
+/* 选中科目。标记上的动画挂在圆点 / 提示符上，不占用 .subj-mark 本身（那里有计时中的呼吸） */
+.subj[aria-pressed='true'] {
+  animation: var(--m-pick-card) var(--m-pick-dur) var(--m-pick-ease);
+}
+.subj[aria-pressed='true'] .subj-mark > .dot,
+.subj[aria-pressed='true'] .subj-mark::before {
+  animation: var(--m-pick) var(--m-pick-dur) var(--m-pick-ease);
+}
+
+/* 开始 ↔ 暂停 / 结束：按钮换出来的时候 */
+.timer-controls > .btn {
+  animation: var(--m-ctl) 0.2s var(--m-enter-ease) backwards;
+}
+
+/* ===================== 关键帧 ===================== */
+@keyframes m-rise {
+  from {
+    opacity: 0;
+    transform: translateY(var(--m-rise));
+  }
+}
+@keyframes m-fade {
+  from {
+    opacity: 0;
+  }
+}
+/* 终端重画：从上往下分几步「打印」出来，先暗后亮。上、左右留出余量，压在边线上的标题不会被裁 */
+@keyframes m-print {
+  from {
+    opacity: 0.35;
+    clip-path: inset(-1em -4px 100% -4px);
+  }
+  to {
+    opacity: 1;
+    clip-path: inset(-1em -4px -4px -4px);
+  }
+}
+@keyframes m-type {
+  from {
+    clip-path: inset(0 100% 0 0);
+  }
+  to {
+    clip-path: inset(0 0 0 0);
+  }
+}
+/* 从左往右揭开（终端的进度条和热度表配合 steps 使用，就是一格一格填进来） */
+@keyframes m-fill {
+  from {
+    clip-path: inset(0 100% 0 0);
+  }
+  to {
+    clip-path: inset(0 0 0 0);
+  }
+}
+@keyframes m-refresh {
+  from {
+    opacity: 0.3;
+  }
+}
+@keyframes m-blink {
+  0%,
+  24%,
+  50%,
+  74% {
+    opacity: 0;
+  }
+  25%,
+  49%,
+  75%,
+  100% {
+    opacity: 1;
+  }
+}
+/* 新粗野：从硬阴影所在的位置弹回原位 */
+@keyframes m-slam {
+  from {
+    opacity: 0;
+    transform: translate(5px, 6px) scale(0.97);
+  }
+  35% {
+    opacity: 1;
+  }
+}
+@keyframes m-punch {
+  from {
+    transform: scale(0.94);
+  }
+}
+@keyframes m-drop {
+  from {
+    opacity: 0;
+    transform: translateY(-0.3em);
+  }
+}
+@keyframes m-grow {
+  from {
+    transform: scaleX(0);
+  }
+}
+@keyframes m-slide-x {
+  from {
+    opacity: 0;
+    transform: translateX(18px);
+  }
+}
+@keyframes m-ring {
+  from {
+    opacity: 0;
+    transform: scale(1.6);
+  }
+}
+
+/* ===================== 换皮肤 / 明暗：整屏过渡 =====================
+   用浏览器的 View Transitions：前后两帧是截图，过渡期间页面本身不重排。
+   skin.ts 按 --m-vt 的值写入 <html data-vt>（取换成的那套皮肤的值），不支持的浏览器直接切换。 */
+html[data-vt]::view-transition-old(root),
+html[data-vt]::view-transition-new(root) {
+  mix-blend-mode: normal;
+}
+/* 纸感：慢速交叉淡化（浏览器默认的过渡，只是放慢） */
+html[data-vt='soft']::view-transition-group(root) {
+  animation-duration: 0.55s;
+  animation-timing-function: ease-in-out;
+}
+html[data-vt='scan']::view-transition-old(root),
+html[data-vt='push']::view-transition-old(root) {
+  animation: none;
+}
+/* 终端：从上到下一行行刷新 */
+html[data-vt='scan']::view-transition-new(root) {
+  animation: vt-scan 0.32s steps(12);
+}
+/* 新粗野：新画面硬切着从右边推进来 */
+html[data-vt='push']::view-transition-new(root) {
+  animation: vt-push 0.34s cubic-bezier(0.2, 0.9, 0.3, 1);
+}
+@keyframes vt-scan {
+  from {
+    clip-path: inset(0 0 100% 0);
+  }
+  to {
+    clip-path: inset(0 0 0 0);
+  }
+}
+@keyframes vt-push {
+  from {
+    transform: translateX(100%);
+  }
+}

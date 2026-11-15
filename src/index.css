@@ -601,27 +601,44 @@ code {
   }
 
   .seg {
+    --seg-pad: 3px;
+    --seg-gap: 2px;
+    position: relative;
     display: flex;
-    gap: 2px;
-    padding: 3px;
+    gap: var(--seg-gap);
+    padding: var(--seg-pad);
     background: var(--surface-2);
     border: var(--bw) solid var(--border);
     border-radius: var(--r-ctl);
   }
+  /* 选中项的底色：一块按 --seg-i 平移的滑块，换选项时滑过去（只动 transform） */
+  .seg::before {
+    content: '';
+    position: absolute;
+    top: var(--seg-pad);
+    bottom: var(--seg-pad);
+    left: var(--seg-pad);
+    width: calc((100% - 2 * var(--seg-pad) - (var(--seg-n) - 1) * var(--seg-gap)) / var(--seg-n));
+    border-radius: calc(var(--r-ctl) - 3px);
+    background: var(--accent-soft);
+    transform: translateX(calc(var(--seg-i) * (100% + var(--seg-gap))));
+    transition: transform var(--m-slide-dur) var(--m-slide-ease);
+  }
+  .seg[data-none]::before {
+    display: none;
+  }
   .seg-item {
+    position: relative;
     flex: 1;
     padding: 0.35rem 0;
     border-radius: calc(var(--r-ctl) - 3px);
     font-size: 13px;
     font-weight: 500;
     color: var(--muted);
-    transition:
-      background-color 0.12s,
-      color 0.12s;
+    transition: color 0.12s;
   }
   .seg-item[aria-pressed='true'] {
     color: var(--accent);
-    background: var(--accent-soft);
   }
 
   /* ---------- 数据展示 ---------- */
@@ -1056,9 +1073,22 @@ code {
     border-top: var(--bw) solid var(--border);
   }
   .tabbar-inner {
+    position: relative;
     display: flex;
     max-width: 32rem;
     margin: 0 auto;
+  }
+  /* 当前页的底色块：按 --i 平移，切换标签时滑过去。默认不显示，用底色标记当前页的皮肤才打开 */
+  .tab-ind {
+    display: none;
+    position: absolute;
+    top: 0;
+    bottom: 0;
+    left: 0;
+    width: 25%;
+    pointer-events: none;
+    transform: translateX(calc(var(--i) * 100%));
+    transition: transform var(--m-slide-dur) var(--m-slide-ease);
   }
   .tab {
     position: relative;
@@ -1307,10 +1337,11 @@ code {
     background: transparent;
   }
   [data-skin='terminal'] .seg {
-    gap: 0;
-    padding: 0;
+    --seg-pad: 0px;
+    --seg-gap: 0px;
     background: transparent;
   }
+  [data-skin='terminal'] .seg::before,
   [data-skin='terminal'] .seg-item {
     border-radius: 0;
   }
@@ -1394,9 +1425,12 @@ code {
   [data-skin='terminal'] .tab-idx::after {
     content: ':';
   }
+  [data-skin='terminal'] .tab-ind {
+    display: block;
+    background: var(--accent);
+  }
   [data-skin='terminal'] .tab[aria-current='page'] {
     color: var(--bg);
-    background: var(--accent);
     font-weight: 700;
   }
   [data-skin='terminal'] .tab[aria-current='page'] .tab-idx {
@@ -1448,10 +1482,14 @@ code {
     box-shadow: 2px 2px 0 var(--border);
   }
   [data-skin='brutal'] .seg {
-    padding: 0;
-    gap: 0;
+    --seg-pad: 0px;
+    --seg-gap: 0px;
     overflow: hidden;
     background: var(--surface);
+  }
+  [data-skin='brutal'] .seg::before {
+    border-radius: 0;
+    background: var(--accent-fill);
   }
   [data-skin='brutal'] .seg-item {
     border-radius: 0;
@@ -1463,7 +1501,6 @@ code {
   }
   [data-skin='brutal'] .seg-item[aria-pressed='true'] {
     color: #111111;
-    background: var(--accent-fill);
   }
   [data-skin='brutal'] .toggle::after {
     background: var(--border);
@@ -1594,9 +1631,12 @@ code {
   [data-skin='brutal'] .tab + .tab {
     border-left: 2px solid var(--border);
   }
+  [data-skin='brutal'] .tab-ind {
+    display: block;
+    background: var(--accent-fill);
+  }
   [data-skin='brutal'] .tab[aria-current='page'] {
     color: #111111;
-    background: var(--accent-fill);
   }
   [data-skin='brutal'] .tab-live {
     background: var(--danger);
@@ -1629,10 +1669,12 @@ code {
   [data-skin='paper'] .btn-secondary {
     background: transparent;
   }
-  [data-skin='paper'] .seg-item[aria-pressed='true'] {
-    color: var(--text);
+  [data-skin='paper'] .seg::before {
     background: var(--surface);
     box-shadow: 0 0 0 1px var(--border);
+  }
+  [data-skin='paper'] .seg-item[aria-pressed='true'] {
+    color: var(--text);
   }
   [data-skin='paper'] .stat-value {
     color: var(--text);
@@ -1674,8 +1716,8 @@ code {
   font-family: var(--font-body);
 }
 
-/* ===================== 动画 =====================
-   只动 opacity，全部交给合成层 */
+/* ===================== 常驻动画 =====================
+   只动 opacity，全部交给合成层。入场 / 切换类的动效在 motion.css */
 @keyframes blink {
   0%,
   55% {
@@ -1695,15 +1737,6 @@ code {
     opacity: 0.35;
   }
 }
-@keyframes page-in {
-  from {
-    opacity: 0.4;
-  }
-}
-.page-in {
-  animation: page-in 0.16s ease-out;
-}
-
 @media (prefers-reduced-motion: reduce) {
   *,
   *::before,

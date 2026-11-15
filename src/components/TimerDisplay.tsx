@@ -7,7 +7,8 @@ const SEGS = 30 // 一行 30 格 = 1 小时，每格 2 分钟
 
 const cells = (s: string) =>
   [...s].map((ch, i) => (
-    <span key={i} className={ch === ':' ? 'd-sep' : 'd'}>
+    // key 带上字符：哪一位变了哪一位重新挂载，CSS 的换字动画只在那一位上播放
+    <span key={`${i}${ch}`} className={ch === ':' ? 'd-sep' : 'd'}>
       {ch}
     </span>
   ))
@@ -70,7 +71,12 @@ function BlockDigits({ ms }: { ms: number }) {
   const glyphs = [...hms].map((ch, i) => {
     const g = GLYPH_PATHS.get(ch)
     if (!g) return null
-    const node = <path key={i} d={g.d} transform={`translate(${x} 0)`} className={i >= cut ? 'sec' : undefined} />
+    // 定位放在外层 <g> 上：CSS 动画的 transform 会盖掉元素自己的 transform 属性
+    const node = (
+      <g key={i} transform={`translate(${x} 0)`}>
+        <path key={ch} d={g.d} className={i >= cut ? 'sec' : undefined} />
+      </g>
+    )
     x += g.w + CELL_W
     return node
   })

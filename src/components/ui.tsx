@@ -30,7 +30,7 @@ export function Sheet({
   return (
     <AnimatePresence>
       {open && (
-        <motion.div className="fixed inset-0 z-50 flex items-end justify-center" initial="hidden" animate="show" exit="hidden">
+        <motion.div className="overlay fixed inset-0 z-50 flex items-end justify-center" initial="hidden" animate="show" exit="hidden">
           <motion.div
             className="absolute inset-0"
             style={{ background: 'var(--backdrop)' }}
@@ -77,8 +77,10 @@ export function Segmented<T extends string>({
   options: Array<{ value: T; label: string }>
   onChange: (v: T) => void
 }) {
+  // 选中项的底色是一块会滑动的滑块（.seg::before），位置由这两个变量决定
+  const index = options.findIndex((o) => o.value === value)
   return (
-    <div className="seg">
+    <div className="seg" style={{ '--seg-n': options.length, '--seg-i': index } as CSSProperties} data-none={index < 0 ? '' : undefined}>
       {options.map((o) => (
         <button key={o.value} onClick={() => onChange(o.value)} aria-pressed={value === o.value} className="seg-item">
           {o.label}

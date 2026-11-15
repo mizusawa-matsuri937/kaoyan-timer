@@ -1,3 +1,4 @@
+import type { CSSProperties } from 'react'
 import { IconChart, IconGrid, IconSettings, IconTimer } from './icons'
 
 export type TabId = 'timer' | 'heat' | 'stats' | 'settings'
@@ -14,6 +15,8 @@ export function TabBar({ tab, onChange, running }: { tab: TabId; onChange: (t: T
   return (
     <nav className="tabbar">
       <div className="tabbar-inner">
+        {/* 当前页的底色块，切换时滑过去；哪些皮肤显示它由 CSS 决定 */}
+        <span className="tab-ind" aria-hidden style={{ '--i': TABS.findIndex((t) => t.id === tab) } as CSSProperties} />
         {TABS.map(({ id, label, Icon }, i) => (
           <button key={id} onClick={() => onChange(id)} aria-current={tab === id ? 'page' : undefined} className="tab">
             <span className="tab-icon">

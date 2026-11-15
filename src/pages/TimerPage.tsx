@@ -98,16 +98,14 @@ export function TimerPage() {
         </p>
       </section>
 
-      <div className="mt-6">
-        <SubjectGrid
-          selected={selected}
-          activeId={active?.subjectId ?? null}
-          running={running}
-          todayBySubject={todayStat?.bySubject ?? {}}
-          todayTotal={todayTotal}
-          onPick={onPick}
-        />
-      </div>
+      <SubjectGrid
+        selected={selected}
+        activeId={active?.subjectId ?? null}
+        running={running}
+        todayBySubject={todayStat?.bySubject ?? {}}
+        todayTotal={todayTotal}
+        onPick={onPick}
+      />
     </div>
   )
 }
