@@ -66,17 +66,17 @@ export function withLive(base: Daily, subjectId: string | null, segments: Segmen
 }
 
 /**
- * 热度等级：0 没学习；1 (0,1h)；2 [1h,5h)；3 [5h,12h)；4 ≥12h
+ * 热度等级：0 没学习；1 (0,1h)；2 [1h,5h)；3 [5h,10h)；4 ≥10h
  */
 export function heatLevel(ms: number): 0 | 1 | 2 | 3 | 4 {
   if (ms <= 0) return 0
   if (ms < 1 * HOUR) return 1
   if (ms < 5 * HOUR) return 2
-  if (ms < 12 * HOUR) return 3
+  if (ms < 10 * HOUR) return 3
   return 4
 }
 
-export const LEVEL_LABELS = ['未学习', '1h 以内', '1–5h', '5–12h', '12h 以上'] as const
+export const LEVEL_LABELS = ['未学习', '1h 以内', '1–5h', '5–10h', '10h 以上'] as const
 
 /** 统计 [from, to] 内各等级的天数 */
 export function levelCounts(daily: Daily, from: string, to: string): [number, number, number, number, number] {

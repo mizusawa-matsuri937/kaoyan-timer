@@ -166,16 +166,17 @@ describe('热度等级', () => {
     expect(heatLevel(HOUR)).toBe(2)
     expect(heatLevel(5 * HOUR - 1)).toBe(2)
     expect(heatLevel(5 * HOUR)).toBe(3)
-    expect(heatLevel(12 * HOUR - 1)).toBe(3)
-    expect(heatLevel(12 * HOUR)).toBe(4)
+    expect(heatLevel(10 * HOUR - 1)).toBe(3)
+    expect(heatLevel(10 * HOUR)).toBe(4)
   })
 
   it('levelCounts 统计范围内每级天数（含未学习）', () => {
     const daily = buildDaily([
       session('ds', [['2026-11-09T08:00:00', '2026-11-09T08:30:00']]),
       session('ds', [['2026-11-10T08:00:00', '2026-11-10T14:00:00']]),
+      session('ds', [['2026-11-11T08:00:00', '2026-11-11T18:00:00']]),
     ])
-    expect(levelCounts(daily, '2026-11-09', '2026-11-12')).toEqual([2, 1, 0, 1, 0])
+    expect(levelCounts(daily, '2026-11-09', '2026-11-12')).toEqual([1, 1, 0, 1, 1])
   })
 })
 
