@@ -1765,7 +1765,7 @@ code {
     transition: opacity 0.28s ease;
   }
   .day-ring-bead {
-    transform-origin: 70px 70px;
+    transform-origin: 76px 76px;
     transition:
       transform 0.42s cubic-bezier(0.22, 1, 0.36, 1),
       opacity 0.2s ease;
@@ -1776,10 +1776,10 @@ code {
       stroke-width 0.14s steps(3);
   }
   .day-ring-sweep {
-    transform-origin: 70px 70px;
+    transform-origin: 76px 76px;
   }
   .day-ring-pointer {
-    transform-origin: 70px 70px;
+    transform-origin: 76px 76px;
     transition:
       transform 0.22s cubic-bezier(0.16, 1, 0.3, 1),
       opacity 0.12s steps(2);
@@ -1794,13 +1794,51 @@ code {
     animation: blink 1.1s steps(1) infinite;
   }
   .day-ring-rest {
-    transform-origin: 70px 70px;
+    transform-origin: 76px 76px;
   }
   .day-ring-wedge {
-    transform-origin: 70px 70px;
+    transform-origin: 76px 76px;
     transition:
       transform 0.3s cubic-bezier(0.3, 1.65, 0.5, 1),
       opacity 0.18s ease;
+  }
+  .day-ring-step {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 28px;
+    height: 28px;
+    background: var(--surface);
+    color: var(--muted);
+    border: var(--bw) solid var(--border);
+    border-radius: var(--r-ctl);
+    font-size: 14px;
+    line-height: 1;
+    cursor: pointer;
+    transition:
+      background-color 0.14s ease,
+      color 0.14s ease,
+      transform 0.12s ease;
+  }
+  .day-ring-step:hover {
+    color: var(--text);
+    background: var(--surface-3);
+  }
+  .day-ring-step:active {
+    transform: var(--press);
+  }
+  [data-skin='terminal'] .day-ring-step {
+    font-size: 12px;
+    font-weight: 700;
+  }
+  [data-skin='brutal'] .day-ring-step {
+    color: var(--text);
+    font-weight: 800;
+    box-shadow: 2px 2px 0 var(--border);
+  }
+  [data-skin='brutal'] .day-ring-step:active {
+    transform: translate(1.5px, 1.5px);
+    box-shadow: none;
   }
   .day-ring-chip {
     display: inline-flex;

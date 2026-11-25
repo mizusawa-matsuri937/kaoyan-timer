@@ -7,8 +7,8 @@ import { useMode, useSkin } from '../skin'
 import { THEME_GREEN } from '../lib/color'
 import { tint } from './ui'
 
-const CX = 70
-const CY = 70
+const CX = 76
+const CY = 76
 const CARDINALS = [
   { deg: 0, label: '00' },
   { deg: 90, label: '06' },
@@ -60,11 +60,11 @@ function prefersReducedMotion(): boolean {
 }
 
 function readDimOpacity(): number {
-  if (typeof document !== 'undefined' && document.documentElement.dataset.mode === 'dark') return 0.68
+  if (typeof document !== 'undefined' && document.documentElement.dataset.mode === 'dark') return 0.72
   return 0.56
 }
 
-/** 00:00–24:00 三皮肤专属圆环时间轴：左环右详情，零滚动跳动 */
+/** 00:00–24:00 三皮肤专属圆环时间轴：上方居中大圆环 + 底部详情与逐段切换，零滚动跳动 */
 export function DayTimelineRing({
   day,
   slices,
@@ -344,401 +344,447 @@ export function DayTimelineRing({
     }
   }, [selectedKey, day, skin])
 
-  const [sx1, sy1] = polar(CX, CY, 53, -45)
-  const [sx2, sy2] = polar(CX, CY, 53, 0)
-  const sweepPath = `M ${CX} ${CY} L ${sx1.toFixed(1)} ${sy1.toFixed(1)} A 53 53 0 0 1 ${sx2.toFixed(1)} ${sy2.toFixed(1)} Z`
+  const stepSlice = (dir: -1 | 1) => {
+    if (slices.length === 0) return
+    if (selectedIndex < 0) {
+      onSelectKey(dir > 0 ? slices[0].key : slices[slices.length - 1].key)
+      return
+    }
+    const nextIdx = (selectedIndex + dir + slices.length) % slices.length
+    onSelectKey(slices[nextIdx].key)
+  }
+
+  const [sx1, sy1] = polar(CX, CY, 61.5, -45)
+  const [sx2, sy2] = polar(CX, CY, 61.5, 0)
+  const sweepPath = `M ${CX} ${CY} L ${sx1.toFixed(1)} ${sy1.toFixed(1)} A 61.5 61.5 0 0 1 ${sx2.toFixed(1)} ${sy2.toFixed(1)} Z`
+
+  const stepLabel =
+    skin === 'terminal'
+      ? `${selectedIndex >= 0 ? String(selectedIndex + 1).padStart(2, '0') : '--'}/${String(slices.length).padStart(2, '0')}`
+      : selectedIndex >= 0
+        ? `${selectedIndex + 1}/${slices.length}`
+        : `${slices.length}段`
 
   return (
-    <div className="day-ring day-ring-box flex items-center gap-3.5 px-3 py-2.5" onClick={() => onSelectKey(null)}>
+    <div className="day-ring day-ring-box px-3.5 pt-3 pb-3" onClick={() => onSelectKey(null)}>
       {skin === 'terminal' && <span className="day-ring-legend">24h_TIMELINE</span>}
 
-      <div ref={dialRef} className="relative h-[122px] w-[122px] shrink-0">
-        <svg ref={svgRef} viewBox="0 0 140 140" className="h-full w-full overflow-visible" aria-label="00:00至24:00学习时间圆环">
-          {skin === 'paper' && (
-            <>
-              <circle cx={CX} cy={CY} r={46} fill="none" stroke="var(--surface-3)" strokeWidth={11.5} />
-              <circle cx={CX} cy={CY} r={36.5} fill="none" stroke="var(--line)" strokeWidth={0.75} />
-              {DOTS_3H.map((h) => {
-                const [x, y] = polar(CX, CY, 36.5, h * 15)
-                return <circle key={h} cx={x} cy={y} r={h % 6 === 0 ? 1.2 : 0.7} fill="var(--faint)" />
-              })}
-              {CARDINALS.map((c) => {
-                const [x, y] = polar(CX, CY, 61, c.deg)
-                return (
-                  <text
-                    key={c.label}
-                    x={x}
-                    y={y}
-                    textAnchor="middle"
-                    dominantBaseline="central"
-                    fontSize={9}
-                    fill="var(--faint)"
-                    className="num"
-                  >
-                    {c.label}
-                  </text>
-                )
-              })}
-              <path
-                className={`day-ring-halo ${selSub ? 'c' : ''}`}
-                style={selSub ? tint(selSub.color) : undefined}
-                d={selectedSlice ? arcPath(CX, CY, 46, selectedSlice.startFrac * 360, selectedSlice.endFrac * 360, 2.0) : ''}
-                fill="none"
-                stroke="var(--c-ring, var(--accent))"
-                strokeWidth={19}
-                strokeLinecap="round"
-                opacity={selectedSlice ? 0.24 : 0}
-                pointerEvents="none"
-              />
-              {slices.map((s) => {
-                const sub = getSubject(s.subjectId)
-                const d = arcPath(CX, CY, 46, s.startFrac * 360, s.endFrac * 360, 2.0)
-                const isSel = selectedSlice?.key === s.key
-                const op = selectedSlice ? (isSel ? 1 : dimOp) : 1
-                return (
-                  <g key={s.key} className="c" style={tint(sub?.color ?? THEME_GREEN)}>
-                    <path
-                      data-paper-arc={s.key}
-                      data-target-op={op}
-                      className="day-ring-paper-arc"
-                      d={d}
-                      pathLength={1}
-                      fill="none"
-                      stroke="var(--c-ring)"
-                      strokeWidth={isSel ? 14.5 : 11.5}
-                      strokeLinecap="butt"
-                      opacity={op}
-                      pointerEvents="none"
-                    />
-                    <path
-                      d={d}
-                      fill="none"
-                      stroke="transparent"
-                      strokeWidth={20}
-                      className="cursor-pointer"
-                      onClick={(e) => {
-                        e.stopPropagation()
-                        onSelectKey(selectedKey === s.key ? null : s.key)
-                      }}
-                    />
-                  </g>
-                )
-              })}
-              <g
-                className={`day-ring-bead ${selSub ? 'c' : ''}`}
-                style={{
-                  ...(selSub ? tint(selSub.color) : undefined),
-                  opacity: selectedSlice ? 1 : 0,
-                  transform: `rotate(${targetAngle.toFixed(1)}deg)`,
-                }}
-                pointerEvents="none"
-              >
-                <circle cx={CX} cy={33} r={2.7} fill="var(--c-ring, var(--accent))" stroke="var(--surface-2)" strokeWidth={1.2} />
-              </g>
-            </>
-          )}
-
-          {skin === 'terminal' && (
-            <>
-              <defs>
-                <linearGradient id={gradId} x1="0" y1="1" x2="1" y2="0">
-                  <stop offset="0%" stopColor="var(--accent)" stopOpacity={0} />
-                  <stop offset="100%" stopColor="var(--accent)" stopOpacity={0.3} />
-                </linearGradient>
-              </defs>
-              <line x1={CX} y1={20} x2={CX} y2={120} stroke="var(--line)" strokeWidth={0.8} strokeDasharray="2 3" />
-              <line x1={20} y1={CY} x2={120} y2={CY} stroke="var(--line)" strokeWidth={0.8} strokeDasharray="2 3" />
-              <circle cx={CX} cy={CY} r={53.5} fill="none" stroke="var(--line)" strokeWidth={0.8} strokeDasharray="2 3.5" />
-              <circle cx={CX} cy={CY} r={38} fill="none" stroke="var(--border)" strokeWidth={1} />
-              <circle cx={CX} cy={CY} r={2.2} fill="var(--muted)" />
-              {HOURS_24.map((h) => {
-                const deg = h * 15
-                const major = h % 6 === 0
-                const mid = h % 3 === 0
-                const [x1, y1] = polar(CX, CY, 38 - (major ? 4 : mid ? 2.6 : 1.5), deg)
-                const [x2, y2] = polar(CX, CY, 38 + (major ? 1.2 : 0), deg)
-                return (
-                  <line
-                    key={h}
-                    x1={x1}
-                    y1={y1}
-                    x2={x2}
-                    y2={y2}
-                    stroke={major ? 'var(--muted)' : 'var(--faint)'}
-                    strokeWidth={major ? 1.2 : 0.75}
-                  />
-                )
-              })}
-              {CARDINALS.map((c) => {
-                const [x, y] = polar(CX, CY, 61.5, c.deg)
-                return (
-                  <text
-                    key={c.label}
-                    x={x}
-                    y={y}
-                    textAnchor="middle"
-                    dominantBaseline="central"
-                    fontSize={9}
-                    fontWeight={700}
-                    fill="var(--muted)"
-                    className="num"
-                  >
-                    {c.label}
-                  </text>
-                )
-              })}
-              {slices.map((s) => {
-                const sub = getSubject(s.subjectId)
-                const d = arcPath(CX, CY, 46.5, s.startFrac * 360, s.endFrac * 360, 2.0)
-                const isSel = selectedSlice?.key === s.key
-                const op = selectedSlice ? (isSel ? 1 : dimOp) : 1
-                return (
-                  <g key={s.key} className="c" style={tint(sub?.color ?? THEME_GREEN)}>
-                    <path
-                      data-term-arc={s.key}
-                      data-start-frac={s.startFrac}
-                      data-target-op={op}
-                      className="day-ring-term-arc"
-                      d={d}
-                      fill="none"
-                      stroke="var(--c-ring)"
-                      strokeWidth={isSel ? 11 : 8.5}
-                      strokeLinecap="butt"
-                      opacity={op}
-                      pointerEvents="none"
-                    />
-                    <path
-                      d={d}
-                      fill="none"
-                      stroke="transparent"
-                      strokeWidth={20}
-                      className="cursor-pointer"
-                      onClick={(e) => {
-                        e.stopPropagation()
-                        onSelectKey(selectedKey === s.key ? null : s.key)
-                      }}
-                    />
-                  </g>
-                )
-              })}
-              <g ref={sweepRef} className="day-ring-sweep" style={{ opacity: 0 }} pointerEvents="none">
-                <path d={sweepPath} fill={`url(#${gradId})`} />
-                <line x1={CX} y1={CY} x2={CX} y2={17} stroke="var(--accent)" strokeWidth={1.5} />
-              </g>
-              <g
-                className={`day-ring-pointer ${selSub ? 'c' : ''}`}
-                style={{
-                  ...(selSub ? tint(selSub.color) : undefined),
-                  opacity: selectedSlice ? 1 : 0,
-                  transform: `rotate(${targetAngle.toFixed(1)}deg)`,
-                }}
-                pointerEvents="none"
-              >
-                <line x1={CX} y1={CY} x2={CX} y2={19} stroke="var(--c-ring, var(--accent))" strokeWidth={1.3} strokeDasharray="2 2" />
-                <circle cx={CX} cy={CY} r={2.5} fill="var(--c-ring, var(--accent))" />
-                <circle cx={CX} cy={17} r={2.2} fill="var(--c-ring, var(--accent))" />
-              </g>
-            </>
-          )}
-
-          {skin === 'brutal' && (
-            <>
-              {CARDINALS.map((c) => {
-                const [x, y] = polar(CX, CY, 63.5, c.deg)
-                return (
-                  <text
-                    key={c.label}
-                    x={x}
-                    y={y}
-                    textAnchor="middle"
-                    dominantBaseline="central"
-                    fontSize={9}
-                    fontWeight={800}
-                    fill="var(--text)"
-                    className="num"
-                  >
-                    {c.label}
-                  </text>
-                )
-              })}
-              {restSpans.map((r, idx) => (
+      {/* 上方居中大圆环（圆心保持留白） */}
+      <div className="flex justify-center pb-1.5">
+        <div ref={dialRef} className="relative h-[212px] w-[212px] shrink-0">
+          <svg ref={svgRef} viewBox="0 0 152 152" className="h-full w-full overflow-visible" aria-label="00:00至24:00学习时间圆环">
+            {skin === 'paper' && (
+              <>
+                <circle cx={CX} cy={CY} r={54} fill="none" stroke="var(--surface-3)" strokeWidth={13.5} />
+                <circle cx={CX} cy={CY} r={43} fill="none" stroke="var(--line)" strokeWidth={0.75} />
+                {DOTS_3H.map((h) => {
+                  const [x, y] = polar(CX, CY, 43, h * 15)
+                  return <circle key={h} cx={x} cy={y} r={h % 6 === 0 ? 1.3 : 0.75} fill="var(--faint)" />
+                })}
+                {CARDINALS.map((c) => {
+                  const [x, y] = polar(CX, CY, 69.5, c.deg)
+                  return (
+                    <text
+                      key={c.label}
+                      x={x}
+                      y={y}
+                      textAnchor="middle"
+                      dominantBaseline="central"
+                      fontSize={9.2}
+                      fill="var(--faint)"
+                      className="num"
+                    >
+                      {c.label}
+                    </text>
+                  )
+                })}
                 <path
-                  key={`rest-${idx}`}
-                  className="day-ring-rest"
-                  d={sectorPath(CX, CY, 36.5, 49.5, r.startDeg, r.endDeg, 0.35)}
-                  fill="var(--surface-3)"
-                  stroke="var(--border)"
-                  strokeWidth={1.6}
-                  strokeLinejoin="round"
+                  className={`day-ring-halo ${selSub ? 'c' : ''}`}
+                  style={selSub ? tint(selSub.color) : undefined}
+                  d={selectedSlice ? arcPath(CX, CY, 54, selectedSlice.startFrac * 360, selectedSlice.endFrac * 360, 2.0) : ''}
+                  fill="none"
+                  stroke="var(--c-ring, var(--accent))"
+                  strokeWidth={22}
+                  strokeLinecap="round"
+                  opacity={selectedSlice ? 0.24 : 0}
+                  pointerEvents="none"
                 />
-              ))}
-              {studySpans.map((sp) => {
-                const s = sp.slice
-                const sub = getSubject(s.subjectId)
-                const isSel = selectedSlice?.key === s.key
-                const midDeg = (sp.vStart + sp.vEnd) / 2
-                const midRad = ((midDeg - 90) * Math.PI) / 180
-                const tf = isSel
-                  ? `translate(${(Math.cos(midRad) * 6.5).toFixed(1)}px, ${(Math.sin(midRad) * 6.5).toFixed(1)}px)`
-                  : 'translate(0px, 0px)'
-                const op = selectedSlice ? (isSel ? 1 : dimOp) : 1
-                const sectorD = sectorPath(CX, CY, 36.5, 49.5, sp.vStart, sp.vEnd, 0.35)
-                const hitD = arcPath(CX, CY, 43, sp.vStart, sp.vEnd, 3.4)
-                return (
-                  <g
-                    key={s.key}
-                    data-brutal-wedge={s.key}
-                    data-target-tf={tf}
-                    data-target-op={op}
-                    className="day-ring-wedge c cursor-pointer"
-                    style={{ ...tint(sub?.color ?? THEME_GREEN), transform: tf, opacity: op }}
-                    onClick={(e) => {
-                      e.stopPropagation()
-                      onSelectKey(selectedKey === s.key ? null : s.key)
-                    }}
-                  >
-                    <path d={sectorD} fill="var(--c-ring)" stroke="var(--border)" strokeWidth={1.6} strokeLinejoin="round" />
-                    <path d={hitD} fill="none" stroke="transparent" strokeWidth={22} />
-                  </g>
-                )
-              })}
-            </>
-          )}
-        </svg>
+                {slices.map((s) => {
+                  const sub = getSubject(s.subjectId)
+                  const d = arcPath(CX, CY, 54, s.startFrac * 360, s.endFrac * 360, 2.0)
+                  const isSel = selectedSlice?.key === s.key
+                  const op = selectedSlice ? (isSel ? 1 : dimOp) : 1
+                  return (
+                    <g key={s.key} className="c" style={tint(sub?.color ?? THEME_GREEN)}>
+                      <path
+                        data-paper-arc={s.key}
+                        data-target-op={op}
+                        className="day-ring-paper-arc"
+                        d={d}
+                        pathLength={1}
+                        fill="none"
+                        stroke="var(--c-ring)"
+                        strokeWidth={isSel ? 16.5 : 13.5}
+                        strokeLinecap="butt"
+                        opacity={op}
+                        pointerEvents="none"
+                      />
+                      <path
+                        d={d}
+                        fill="none"
+                        stroke="transparent"
+                        strokeWidth={26}
+                        className="cursor-pointer"
+                        onClick={(e) => {
+                          e.stopPropagation()
+                          onSelectKey(selectedKey === s.key ? null : s.key)
+                        }}
+                      />
+                    </g>
+                  )
+                })}
+                <g
+                  className={`day-ring-bead ${selSub ? 'c' : ''}`}
+                  style={{
+                    ...(selSub ? tint(selSub.color) : undefined),
+                    opacity: selectedSlice ? 1 : 0,
+                    transform: `rotate(${targetAngle.toFixed(1)}deg)`,
+                  }}
+                  pointerEvents="none"
+                >
+                  <circle cx={CX} cy={CY - 43} r={3.1} fill="var(--c-ring, var(--accent))" stroke="var(--surface-2)" strokeWidth={1.35} />
+                </g>
+              </>
+            )}
+
+            {skin === 'terminal' && (
+              <>
+                <defs>
+                  <linearGradient id={gradId} x1="0" y1="1" x2="1" y2="0">
+                    <stop offset="0%" stopColor="var(--accent)" stopOpacity={0} />
+                    <stop offset="100%" stopColor="var(--accent)" stopOpacity={0.3} />
+                  </linearGradient>
+                </defs>
+                <line x1={CX} y1={16} x2={CX} y2={136} stroke="var(--line)" strokeWidth={0.8} strokeDasharray="2 3" />
+                <line x1={16} y1={CY} x2={136} y2={CY} stroke="var(--line)" strokeWidth={0.8} strokeDasharray="2 3" />
+                <circle cx={CX} cy={CY} r={61.5} fill="none" stroke="var(--line)" strokeWidth={0.8} strokeDasharray="2 3.5" />
+                <circle cx={CX} cy={CY} r={44.5} fill="none" stroke="var(--border)" strokeWidth={1} />
+                <circle cx={CX} cy={CY} r={2.4} fill="var(--muted)" />
+                {HOURS_24.map((h) => {
+                  const deg = h * 15
+                  const major = h % 6 === 0
+                  const mid = h % 3 === 0
+                  const [x1, y1] = polar(CX, CY, 44.5 - (major ? 4.8 : mid ? 3.0 : 1.7), deg)
+                  const [x2, y2] = polar(CX, CY, 44.5 + (major ? 1.4 : 0), deg)
+                  return (
+                    <line
+                      key={h}
+                      x1={x1}
+                      y1={y1}
+                      x2={x2}
+                      y2={y2}
+                      stroke={major ? 'var(--muted)' : 'var(--faint)'}
+                      strokeWidth={major ? 1.2 : 0.75}
+                    />
+                  )
+                })}
+                {CARDINALS.map((c) => {
+                  const [x, y] = polar(CX, CY, 70, c.deg)
+                  return (
+                    <text
+                      key={c.label}
+                      x={x}
+                      y={y}
+                      textAnchor="middle"
+                      dominantBaseline="central"
+                      fontSize={9}
+                      fontWeight={700}
+                      fill="var(--muted)"
+                      className="num"
+                    >
+                      {c.label}
+                    </text>
+                  )
+                })}
+                {slices.map((s) => {
+                  const sub = getSubject(s.subjectId)
+                  const d = arcPath(CX, CY, 53.5, s.startFrac * 360, s.endFrac * 360, 2.0)
+                  const isSel = selectedSlice?.key === s.key
+                  const op = selectedSlice ? (isSel ? 1 : dimOp) : 1
+                  return (
+                    <g key={s.key} className="c" style={tint(sub?.color ?? THEME_GREEN)}>
+                      <path
+                        data-term-arc={s.key}
+                        data-start-frac={s.startFrac}
+                        data-target-op={op}
+                        className="day-ring-term-arc"
+                        d={d}
+                        fill="none"
+                        stroke="var(--c-ring)"
+                        strokeWidth={isSel ? 12.8 : 10}
+                        strokeLinecap="butt"
+                        opacity={op}
+                        pointerEvents="none"
+                      />
+                      <path
+                        d={d}
+                        fill="none"
+                        stroke="transparent"
+                        strokeWidth={26}
+                        className="cursor-pointer"
+                        onClick={(e) => {
+                          e.stopPropagation()
+                          onSelectKey(selectedKey === s.key ? null : s.key)
+                        }}
+                      />
+                    </g>
+                  )
+                })}
+                <g ref={sweepRef} className="day-ring-sweep" style={{ opacity: 0 }} pointerEvents="none">
+                  <path d={sweepPath} fill={`url(#${gradId})`} />
+                  <line x1={CX} y1={CY} x2={CX} y2={14.5} stroke="var(--accent)" strokeWidth={1.5} />
+                </g>
+                <g
+                  className={`day-ring-pointer ${selSub ? 'c' : ''}`}
+                  style={{
+                    ...(selSub ? tint(selSub.color) : undefined),
+                    opacity: selectedSlice ? 1 : 0,
+                    transform: `rotate(${targetAngle.toFixed(1)}deg)`,
+                  }}
+                  pointerEvents="none"
+                >
+                  <line x1={CX} y1={CY} x2={CX} y2={17} stroke="var(--c-ring, var(--accent))" strokeWidth={1.35} strokeDasharray="2 2" />
+                  <circle cx={CX} cy={CY} r={2.6} fill="var(--c-ring, var(--accent))" />
+                  <circle cx={CX} cy={14.5} r={2.3} fill="var(--c-ring, var(--accent))" />
+                </g>
+              </>
+            )}
+
+            {skin === 'brutal' && (
+              <>
+                {CARDINALS.map((c) => {
+                  const [x, y] = polar(CX, CY, 71.5, c.deg)
+                  return (
+                    <text
+                      key={c.label}
+                      x={x}
+                      y={y}
+                      textAnchor="middle"
+                      dominantBaseline="central"
+                      fontSize={9.5}
+                      fontWeight={800}
+                      fill="var(--text)"
+                      className="num"
+                    >
+                      {c.label}
+                    </text>
+                  )
+                })}
+                {restSpans.map((r, idx) => (
+                  <path
+                    key={`rest-${idx}`}
+                    className="day-ring-rest"
+                    d={sectorPath(CX, CY, 42.5, 57.5, r.startDeg, r.endDeg, 0.35)}
+                    fill="var(--surface-3)"
+                    stroke="var(--border)"
+                    strokeWidth={1.75}
+                    strokeLinejoin="round"
+                  />
+                ))}
+                {studySpans.map((sp) => {
+                  const s = sp.slice
+                  const sub = getSubject(s.subjectId)
+                  const isSel = selectedSlice?.key === s.key
+                  const midDeg = (sp.vStart + sp.vEnd) / 2
+                  const midRad = ((midDeg - 90) * Math.PI) / 180
+                  const tf = isSel
+                    ? `translate(${(Math.cos(midRad) * 7).toFixed(1)}px, ${(Math.sin(midRad) * 7).toFixed(1)}px)`
+                    : 'translate(0px, 0px)'
+                  const op = selectedSlice ? (isSel ? 1 : dimOp) : 1
+                  const sectorD = sectorPath(CX, CY, 42.5, 57.5, sp.vStart, sp.vEnd, 0.35)
+                  const hitD = arcPath(CX, CY, 50, sp.vStart, sp.vEnd, 3.4)
+                  return (
+                    <g
+                      key={s.key}
+                      data-brutal-wedge={s.key}
+                      data-target-tf={tf}
+                      data-target-op={op}
+                      className="day-ring-wedge c cursor-pointer"
+                      style={{ ...tint(sub?.color ?? THEME_GREEN), transform: tf, opacity: op }}
+                      onClick={(e) => {
+                        e.stopPropagation()
+                        onSelectKey(selectedKey === s.key ? null : s.key)
+                      }}
+                    >
+                      <path
+                        d={sectorD}
+                        fill="var(--c-ring)"
+                        stroke="var(--border)"
+                        strokeWidth={isSel ? 2.1 : 1.75}
+                        strokeLinejoin="round"
+                      />
+                      <path d={hitD} fill="none" stroke="transparent" strokeWidth={26} />
+                    </g>
+                  )
+                })}
+              </>
+            )}
+          </svg>
+        </div>
       </div>
 
-      {/* 右侧留白详情区（圆环中心不放任何文字） */}
-      <div ref={sideRef} className="min-w-0 flex-1 pr-0.5">
-        {selectedSlice ? (
-          skin === 'terminal' ? (
-            <div className="c" style={tint(selColor)}>
-              <div className="flex items-center justify-between gap-2 text-[11px] text-muted">
-                <span className="truncate">
-                  $ focus --seg {String(selectedIndex + 1).padStart(2, '0')}/{String(slices.length).padStart(2, '0')}
-                </span>
-                <button
-                  type="button"
-                  className="shrink-0 text-accent"
-                  onClick={(e) => {
-                    e.stopPropagation()
-                    onSelectKey(null)
-                  }}
-                >
-                  [ESC]
-                </button>
+      {/* 底部横向详情栏 + 逐段切换（圆环中心不放任何文字） */}
+      <div className="mt-1 flex items-center justify-between gap-2.5 border-t pt-2.5" style={{ borderColor: 'var(--line)' }}>
+        <div ref={sideRef} className="min-w-0 flex-1">
+          {selectedSlice ? (
+            skin === 'terminal' ? (
+              <div className="c" style={tint(selColor)}>
+                <div className="flex items-center gap-1.5 text-sm font-bold">
+                  <span className="truncate" style={{ color: 'var(--c-ring)' }}>
+                    &gt; {selSub?.name ?? selectedSlice.subjectId}
+                  </span>
+                  {selectedSlice.isLive && <span className="shrink-0 text-[10px] text-accent">[LIVE]</span>}
+                  <span className="num shrink-0 text-xs font-bold">
+                    [{formatDuration(selectedSlice.durationMs)}]
+                    <span className="day-ring-cursor" />
+                  </span>
+                </div>
+                <div className="num mt-0.5 flex items-center gap-2 text-xs text-muted">
+                  <span>
+                    $ {formatClock(selectedSlice.start)} - {fmtEnd(selectedSlice.end)}
+                  </span>
+                  <button
+                    type="button"
+                    className="shrink-0 text-[11px] text-accent"
+                    onClick={(e) => {
+                      e.stopPropagation()
+                      onSelectKey(null)
+                    }}
+                  >
+                    [ESC]
+                  </button>
+                </div>
               </div>
-              <div className="mt-0.5 flex items-center gap-1.5 text-sm font-bold" style={{ color: 'var(--c-ring)' }}>
-                <span className="truncate">&gt; {selSub?.name ?? selectedSlice.subjectId}</span>
-                {selectedSlice.isLive && <span className="shrink-0 text-[10px] text-accent">[LIVE]</span>}
+            ) : skin === 'brutal' ? (
+              <div>
+                <div className="flex flex-wrap items-center gap-2">
+                  <span className="day-ring-chip c" style={tint(selColor)}>
+                    {selSub?.name ?? selectedSlice.subjectId}
+                    {selectedSlice.isLive ? ' · 计时中' : ''}
+                  </span>
+                  <span className="num text-base font-extrabold leading-none">{formatDuration(selectedSlice.durationMs)}</span>
+                </div>
+                <div className="mt-1 flex items-center gap-2 text-xs">
+                  <span className="num font-bold text-muted">
+                    {formatClock(selectedSlice.start)} – {fmtEnd(selectedSlice.end)}
+                  </span>
+                  <button
+                    type="button"
+                    className="shrink-0 rounded px-1.5 py-0.5 text-[10px] font-bold text-muted"
+                    style={{ border: '1px solid var(--line)' }}
+                    onClick={(e) => {
+                      e.stopPropagation()
+                      onSelectKey(null)
+                    }}
+                  >
+                    闭合
+                  </button>
+                </div>
               </div>
-              <div className="num mt-1 flex items-center gap-2 text-xs">
-                <span className="text-muted">
-                  {formatClock(selectedSlice.start)} - {fmtEnd(selectedSlice.end)}
-                </span>
-                <span className="font-bold">
-                  [{formatDuration(selectedSlice.durationMs)}]
-                  <span className="day-ring-cursor" />
-                </span>
-              </div>
-            </div>
-          ) : skin === 'brutal' ? (
-            <div>
-              <div className="flex items-center justify-between gap-2">
-                <span className="day-ring-chip c" style={tint(selColor)}>
-                  {selSub?.name ?? selectedSlice.subjectId}
-                  {selectedSlice.isLive ? ' · 计时中' : ''}
-                </span>
-                <button
-                  type="button"
-                  className="shrink-0 rounded px-1.5 py-0.5 text-[11px] font-bold text-muted"
-                  style={{ border: '1px solid var(--line)' }}
-                  onClick={(e) => {
-                    e.stopPropagation()
-                    onSelectKey(null)
-                  }}
-                >
-                  闭合
-                </button>
-              </div>
-              <div className="mt-1.5 flex items-baseline gap-2.5">
-                <span className="num text-lg font-extrabold leading-none">{formatDuration(selectedSlice.durationMs)}</span>
-                <span className="num text-xs font-bold text-muted">
-                  {formatClock(selectedSlice.start)} – {fmtEnd(selectedSlice.end)}
-                </span>
-              </div>
-              <div className="mt-1 text-[11px] font-medium text-faint">
-                第 {selectedIndex + 1} / {slices.length} 段 · 点击空白复位
-              </div>
-            </div>
-          ) : (
-            <div className="c" style={tint(selColor)}>
-              <div className="flex items-center justify-between gap-2">
-                <div className="flex min-w-0 items-center gap-1.5">
-                  <span className="h-2 w-2 shrink-0 rounded-full" style={{ background: 'var(--c-ring)' }} />
+            ) : (
+              <div className="c" style={tint(selColor)}>
+                <div className="flex items-center gap-1.5">
+                  <span className="h-2.5 w-2.5 shrink-0 rounded-full" style={{ background: 'var(--c-ring)' }} />
                   <span className="truncate text-sm font-semibold">{selSub?.name ?? selectedSlice.subjectId}</span>
                   {selectedSlice.isLive && (
                     <span className="shrink-0 rounded px-1 py-0.5 text-[10px] text-accent" style={{ background: 'var(--accent-soft)' }}>
                       计时中
                     </span>
                   )}
+                  <span className="num ml-1 shrink-0 text-[15px] font-semibold leading-none">
+                    {formatDuration(selectedSlice.durationMs)}
+                  </span>
                 </div>
-                <button
-                  type="button"
-                  className="shrink-0 text-[11px] text-accent"
-                  onClick={(e) => {
-                    e.stopPropagation()
-                    onSelectKey(null)
-                  }}
-                >
-                  收起
-                </button>
+                <div className="mt-1 flex items-center gap-2 text-xs">
+                  <span className="num text-muted">
+                    {formatClock(selectedSlice.start)} – {fmtEnd(selectedSlice.end)}
+                  </span>
+                  <button
+                    type="button"
+                    className="shrink-0 text-[11px] text-accent"
+                    onClick={(e) => {
+                      e.stopPropagation()
+                      onSelectKey(null)
+                    }}
+                  >
+                    收起
+                  </button>
+                </div>
               </div>
-              <div className="mt-1 flex items-baseline gap-2.5">
-                <span className="num text-lg font-semibold leading-none">{formatDuration(selectedSlice.durationMs)}</span>
-                <span className="num text-xs text-muted">
-                  {formatClock(selectedSlice.start)} – {fmtEnd(selectedSlice.end)}
-                </span>
+            )
+          ) : skin === 'terminal' ? (
+            <div>
+              <div className="num flex items-center gap-1.5 text-sm font-bold">
+                <span>$ {summary.spanText}</span>
+                <span className="day-ring-cursor" />
               </div>
-              <div className="mt-1 text-[11px] text-faint">
-                第 {selectedIndex + 1} / {slices.length} 段 · 点击圆环空白处取消
+              <div className="mt-0.5 truncate text-[11px] text-faint">
+                {slices.length} segments · 点弧段或右侧切段
               </div>
             </div>
-          )
-        ) : skin === 'terminal' ? (
-          <div>
-            <div className="text-[11px] text-muted">$ status --24h</div>
-            <div className="num mt-0.5 text-sm font-bold">
-              {summary.spanText}
-              <span className="day-ring-cursor" />
+          ) : skin === 'brutal' ? (
+            <div>
+              <div className="flex flex-wrap items-center gap-1.5">
+                <span className="day-ring-badge">全天 {slices.length} 段</span>
+                <span className="num text-xs font-extrabold">{summary.spanText}</span>
+              </div>
+              <div className="mt-1 flex flex-wrap items-center gap-x-2.5 gap-y-0.5 text-[11px] font-semibold text-muted">
+                {summary.subjects.map((sub) => (
+                  <span key={sub.id} className="c inline-flex items-center gap-1" style={tint(sub.color)}>
+                    <i
+                      className="inline-block h-2 w-2 rounded-full"
+                      style={{ background: 'var(--c-ring)', border: '1px solid var(--border)' }}
+                    />
+                    {sub.short}
+                  </span>
+                ))}
+              </div>
             </div>
-            <div className="mt-1 text-[11px] text-faint">{slices.length} segments · 点击左侧色块锁定</div>
-          </div>
-        ) : skin === 'brutal' ? (
-          <div>
-            <div className="flex flex-wrap items-center gap-1.5">
-              <span className="day-ring-badge">全天 {slices.length} 段</span>
-              <span className="num text-xs font-extrabold">{summary.spanText}</span>
+          ) : (
+            <div>
+              <div className="flex items-baseline gap-2">
+                <span className="num text-sm font-semibold">{summary.spanText}</span>
+                <span className="text-[11px] text-muted">点击弧段查看明细</span>
+              </div>
+              <div className="num mt-0.5 truncate text-[11px] text-faint">
+                {summary.periodText || `共 ${slices.length} 段学习记录`}
+              </div>
             </div>
-            <div className="mt-1.5 flex flex-wrap items-center gap-x-2.5 gap-y-1 text-[11px] font-semibold text-muted">
-              {summary.subjects.map((sub) => (
-                <span key={sub.id} className="c inline-flex items-center gap-1" style={tint(sub.color)}>
-                  <i
-                    className="inline-block h-2 w-2 rounded-full"
-                    style={{ background: 'var(--c-ring)', border: '1px solid var(--border)' }}
-                  />
-                  {sub.short}
-                </span>
-              ))}
-            </div>
-            <div className="mt-1 text-[11px] text-faint">点击左侧色块断开弹出</div>
-          </div>
-        ) : (
-          <div>
-            <div className="text-[11px] text-muted">全天活跃跨度</div>
-            <div className="num mt-0.5 text-base font-semibold">{summary.spanText}</div>
-            <div className="num mt-1 text-[11px] text-faint">
-              {summary.periodText ? `${summary.periodText} · 点色块查看` : `共 ${slices.length} 段 · 点色块查看`}
-            </div>
+          )}
+        </div>
+
+        {/* 逐段微调切段器：方便手机精准选中极短学习时段 */}
+        {slices.length > 0 && (
+          <div className="flex shrink-0 items-center gap-1" onClick={(e) => e.stopPropagation()}>
+            <button
+              type="button"
+              className="day-ring-step"
+              aria-label="上一段学习"
+              title="上一段"
+              onClick={() => stepSlice(-1)}
+            >
+              {skin === 'terminal' ? '<' : '‹'}
+            </button>
+            <span className="num min-w-[30px] text-center text-[11px] text-muted">{stepLabel}</span>
+            <button
+              type="button"
+              className="day-ring-step"
+              aria-label="下一段学习"
+              title="下一段"
+              onClick={() => stepSlice(1)}
+            >
+              {skin === 'terminal' ? '>' : '›'}
+            </button>
           </div>
         )}
       </div>
