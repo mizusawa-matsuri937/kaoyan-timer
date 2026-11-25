@@ -1,4 +1,4 @@
-import { addDays, dayKey, diffDays, nextMidnight, startOfMonth, startOfWeek } from './dates'
+import { addDays, dayKey, diffDays, nextMidnight, parseDay, startOfMonth, startOfWeek } from './dates'
 import { SUBJECTS, type GroupId, getSubject } from './subjects'
 import type { Segment, Session } from './types'
 
@@ -206,4 +206,120 @@ export function sessionsOnDay(sessions: Session[], day: string): Session[] {
   return sessions
     .filter((s) => !s.deleted && s.segments.some((seg) => splitByDay(seg).some(([d]) => d === day)))
     .sort((a, b) => a.startAt - b.startAt)
+}
+
+export interface LiveSliceInput {
+  sessionId: string
+  subjectId: string
+  segments: Segment[]
+}
+
+export interface DaySlice {
+  key: string
+  sessionId: string
+  subjectId: string
+  start: number
+  end: number
+  durationMs: number
+  /** [0, 1] 落在当天 00:00–24:00 的起止比例 */
+  startFrac: number
+  endFrac: number
+  isLive?: boolean
+}
+
+/** 提取某天 [0, 24h] 区间内的全部连续学习切片（跨午夜记录自动裁切至当天边界，支持叠加 live 去重） */
+export function dayTimelineSlices(sessions: Session[], day: string, live?: LiveSliceInput | null): DaySlice[] {
+  const dayStart = parseDay(day).getTime()
+  const dayEnd = parseDay(addDays(day, 1)).getTime()
+  const spanMs = dayEnd - dayStart
+  if (spanMs <= 0) return []
+
+  const out: DaySlice[] = []
+  const pushSegs = (prefix: string, sessionId: string, subjectId: string, segments: Segment[], isLive?: boolean) => {
+    for (let i = 0; i < segments.length; i++) {
+      const seg = segments[i]
+      if (seg.end <= seg.start) continue
+      const start = Math.max(seg.start, dayStart)
+      const end = Math.min(seg.end, dayEnd)
+      if (end <= start) continue
+      out.push({
+        key: `${prefix}${sessionId}:${i}`,
+        sessionId,
+        subjectId,
+        start,
+        end,
+        durationMs: end - start,
+        startFrac: (start - dayStart) / spanMs,
+        endFrac: (end - dayStart) / spanMs,
+        ...(isLive ? { isLive: true } : {}),
+      })
+    }
+  }
+
+  for (const s of sessions) {
+    if (s.deleted) continue
+    if (live && s.id === live.sessionId) continue
+    pushSegs('', s.id, s.subjectId, s.segments)
+  }
+  if (live && live.segments.length > 0) {
+    pushSegs('live:', live.sessionId, live.subjectId, live.segments, true)
+  }
+
+  return out.sort((a, b) => a.start - b.start || a.end - b.end)
+}
+
+export interface VisualStudySpan {
+  slice: DaySlice
+  vStart: number
+  vEnd: number
+}
+
+export interface RestSpan {
+  startDeg: number
+  endDeg: number
+}
+
+/**
+ * 将当天切片映射为 [0°, 360°] 上互不重叠的视觉扇区，并计算互补的休息扇区（跨 00:00 午夜自动合并）。
+ * 用于新粗野皮肤的无底圆断环渲染。
+ */
+export function partitionRingSpans(
+  slices: DaySlice[],
+  minDeg = 3.4,
+): { studySpans: VisualStudySpan[]; restSpans: RestSpan[] } {
+  if (slices.length === 0) return { studySpans: [], restSpans: [] }
+  const effMin = Math.min(minDeg, 360 / slices.length)
+  let cursor = 0
+  const studySpans: VisualStudySpan[] = slices.map((slice) => {
+    const rawS = slice.startFrac * 360
+    const rawE = slice.endFrac * 360
+    const vStart = Math.max(cursor, rawS)
+    const vEnd = Math.max(vStart + effMin, rawE)
+    cursor = vEnd
+    return { slice, vStart, vEnd }
+  })
+
+  if (studySpans[studySpans.length - 1].vEnd > 360) {
+    let rightLimit = 360
+    for (let i = studySpans.length - 1; i >= 0; i--) {
+      const sp = studySpans[i]
+      if (sp.vEnd <= rightLimit) break
+      const width = Math.max(effMin, sp.vEnd - sp.vStart)
+      const minStart = i * effMin
+      sp.vEnd = rightLimit
+      sp.vStart = Math.max(minStart, rightLimit - width)
+      rightLimit = sp.vStart
+    }
+  }
+
+  const restSpans: RestSpan[] = []
+  const n = studySpans.length
+  for (let i = 0; i < n; i++) {
+    const curEnd = studySpans[i].vEnd
+    const nextStart = i < n - 1 ? studySpans[i + 1].vStart : studySpans[0].vStart + 360
+    if (nextStart - curEnd > 0.35) {
+      restSpans.push({ startDeg: curEnd, endDeg: nextStart })
+    }
+  }
+  return { studySpans, restSpans }
 }

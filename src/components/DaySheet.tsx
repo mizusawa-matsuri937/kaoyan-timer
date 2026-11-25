@@ -1,9 +1,10 @@
-import { useMemo } from 'react'
-import { heatLevel, LEVEL_LABELS, splitByDay, type DayStat } from '../domain/aggregate'
+import { useEffect, useMemo, useState } from 'react'
+import { dayTimelineSlices, heatLevel, LEVEL_LABELS, splitByDay, type DayStat, type LiveSliceInput } from '../domain/aggregate'
 import { formatClock, formatDayCN } from '../domain/dates'
 import { formatDuration, formatDurationCN } from '../domain/format'
 import { SUBJECTS, getSubject } from '../domain/subjects'
 import type { Session } from '../domain/types'
+import { DayTimelineRing } from './DayTimelineRing'
 import { HEAT_VARS } from './Heatmap'
 import { IconChevron, IconPlus } from './icons'
 import { Bar, Sheet, tint } from './ui'
@@ -12,6 +13,7 @@ export function DaySheet({
   day,
   stat,
   sessions,
+  live,
   onClose,
   onEdit,
   onAdd,
@@ -19,12 +21,25 @@ export function DaySheet({
   day: string | null
   stat: DayStat | undefined
   sessions: Session[]
+  live?: LiveSliceInput | null
   onClose: () => void
   onEdit: (s: Session) => void
   onAdd: (day: string) => void
 }) {
+  const [selectedSliceKey, setSelectedSliceKey] = useState<string | null>(null)
+  useEffect(() => {
+    setSelectedSliceKey(null)
+  }, [day])
+
   const total = stat?.total ?? 0
   const lvl = heatLevel(total)
+  const slices = useMemo(() => (day ? dayTimelineSlices(sessions, day, live) : []), [sessions, day, live])
+  const activeSliceKey = slices.some((sl) => sl.key === selectedSliceKey) ? selectedSliceKey : null
+  const selectedSessionId = useMemo(
+    () => slices.find((sl) => sl.key === activeSliceKey)?.sessionId ?? null,
+    [slices, activeSliceKey],
+  )
+
   const rows = useMemo(
     () =>
       SUBJECTS.map((s) => ({ s, ms: stat?.bySubject[s.id] ?? 0 }))
@@ -45,6 +60,17 @@ export function DaySheet({
               <div className="text-xs text-muted">等级：{LEVEL_LABELS[lvl]}</div>
             </div>
           </div>
+
+          {slices.length > 0 && (
+            <div className="mt-3">
+              <DayTimelineRing
+                day={day}
+                slices={slices}
+                selectedKey={activeSliceKey}
+                onSelectKey={setSelectedSliceKey}
+              />
+            </div>
+          )}
 
           {rows.length > 0 && (
             <div className="mt-4 space-y-2.5">
@@ -78,11 +104,13 @@ export function DaySheet({
                 let msToday = 0
                 for (const g of s.segments) for (const [d, ms] of splitByDay(g)) if (d === day) msToday += ms
                 const crossDay = splitByDay({ start: first.start, end: last.end }).length > 1
+                const highlighted = selectedSessionId === s.id
                 return (
                   <button
                     key={s.id}
                     onClick={() => onEdit(s)}
-                    className="c flex w-full items-center gap-3 px-4 py-3 text-left active:bg-card"
+                    data-highlighted={highlighted ? '' : undefined}
+                    className="c day-ring-row flex w-full items-center gap-3 px-4 py-3 text-left active:bg-card"
                     style={sub ? tint(sub.color) : undefined}
                   >
                     <span className="dot" style={{ width: 6, height: 32, borderRadius: 3 }} />
@@ -91,6 +119,9 @@ export function DaySheet({
                         {sub?.name ?? s.subjectId}
                         {s.source === 'manual' && (
                           <span className="rounded-md border border-line bg-card px-1.5 py-0.5 text-[10px] text-muted">补录</span>
+                        )}
+                        {highlighted && (
+                          <span className="rounded-md border border-line bg-card px-1.5 py-0.5 text-[10px] text-accent">圆环已选中</span>
                         )}
                       </div>
                       <div className="num text-xs text-muted">

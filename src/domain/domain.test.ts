@@ -2,9 +2,11 @@ import { describe, expect, it } from 'vitest'
 import {
   HOUR,
   buildDaily,
+  dayTimelineSlices,
   groupTotals,
   heatLevel,
   levelCounts,
+  partitionRingSpans,
   sessionsOnDay,
   splitByDay,
   streaks,
@@ -283,5 +285,73 @@ describe('模拟测试', () => {
     expect(examTimeLeft(paused, EXAM, t0 + 2 * HOUR)).toBeNull()
     const resumed = resumeTimer(paused, t0 + 2 * HOUR)
     expect(examTimeLeft(resumed, EXAM, t0 + 2 * HOUR + 60000)).toBe(2 * HOUR - 60000)
+  })
+})
+
+describe('当日 24h 时间轴切片与圆环分区', () => {
+  it('按开始时间排序并计算 [0, 1] 比例，保留不足 1 分钟的极短段且过滤已删除记录', () => {
+    const s1 = session('calc', [
+      ['2026-11-24T18:16:00', '2026-11-24T19:59:00'],
+      ['2026-11-24T20:20:00', '2026-11-24T21:46:00'],
+    ])
+    const s2 = session('ds', [['2026-11-24T15:17:00', '2026-11-24T15:17:15']]) // 15 秒
+    const del = session('english', [['2026-11-24T09:00:00', '2026-11-24T10:00:00']], { deleted: true })
+
+    const slices = dayTimelineSlices([s1, s2, del], '2026-11-24')
+    expect(slices).toHaveLength(3)
+    expect(slices.map((x) => x.subjectId)).toEqual(['ds', 'calc', 'calc'])
+    expect(slices[0].durationMs).toBe(15_000)
+    expect(slices[1].startFrac).toBeCloseTo((18 * 60 + 16) / 1440, 5)
+    expect(slices[1].endFrac).toBeCloseTo((19 * 60 + 59) / 1440, 5)
+  })
+
+  it('跨午夜记录在两天分别精准裁切至 24:00 与 00:00', () => {
+    const cross = session('ds', [['2026-11-24T23:30:00', '2026-11-25T01:15:00']])
+    const day1 = dayTimelineSlices([cross], '2026-11-24')
+    const day2 = dayTimelineSlices([cross], '2026-11-25')
+
+    expect(day1).toHaveLength(1)
+    expect(day1[0].durationMs).toBe(30 * MIN)
+    expect(day1[0].startFrac).toBeCloseTo(23.5 / 24, 5)
+    expect(day1[0].endFrac).toBe(1)
+
+    expect(day2).toHaveLength(1)
+    expect(day2[0].durationMs).toBe(75 * MIN)
+    expect(day2[0].startFrac).toBe(0)
+    expect(day2[0].endFrac).toBeCloseTo(1.25 / 24, 5)
+  })
+
+  it('叠加正在计时的 live 分段并对同 sessionId 的旧存档去重', () => {
+    const archived = session('ds', [['2026-11-24T08:00:00', '2026-11-24T09:00:00']], { id: 'active-id' })
+    const other = session('ds', [['2026-11-24T10:00:00', '2026-11-24T11:00:00']], { id: 'other-id' })
+    const live = {
+      sessionId: 'active-id',
+      subjectId: 'calc',
+      segments: [{ start: t('2026-11-24T08:00:00'), end: t('2026-11-24T09:30:00') }],
+    }
+    const slices = dayTimelineSlices([archived, other], '2026-11-24', live)
+    expect(slices).toHaveLength(2)
+    expect(slices[0].isLive).toBe(true)
+    expect(slices[0].durationMs).toBe(90 * MIN)
+    expect(slices[1].sessionId).toBe('other-id')
+  })
+
+  it('partitionRingSpans 保持极短段可见、合并跨午夜休息段且全环不溢出 360°', () => {
+    const s = session('calc', [
+      ['2026-11-24T15:17:00', '2026-11-24T15:18:00'],
+      ['2026-11-24T23:58:00', '2026-11-25T00:00:00'],
+    ])
+    const slices = dayTimelineSlices([s], '2026-11-24')
+    const { studySpans, restSpans } = partitionRingSpans(slices, 3.4)
+
+    expect(studySpans).toHaveLength(2)
+    expect(studySpans[0].vEnd - studySpans[0].vStart).toBeGreaterThanOrEqual(3.4)
+    expect(studySpans[1].vEnd - studySpans[1].vStart).toBeCloseTo(3.4, 6)
+    expect(studySpans[1].vEnd).toBeLessThanOrEqual(360)
+    expect(studySpans[0].vEnd).toBeLessThanOrEqual(studySpans[1].vStart)
+
+    // 2 个学习段之间 1 个休息段 + 跨 00:00 合并的 1 个夜间休息段
+    expect(restSpans).toHaveLength(2)
+    expect(restSpans[1].endDeg - restSpans[1].startDeg).toBeGreaterThan(180)
   })
 })

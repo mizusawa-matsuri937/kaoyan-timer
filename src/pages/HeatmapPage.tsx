@@ -6,18 +6,25 @@ import { Bar, SectionTitle, Stat } from '../components/ui'
 import { LEVEL_LABELS, levelCounts, sessionsOnDay } from '../domain/aggregate'
 import { dayKey, diffDays } from '../domain/dates'
 import { formatDuration } from '../domain/format'
+import { liveSegments } from '../domain/timer'
 import { useNow } from '../hooks/useNow'
 import { useLiveDaily, useVisibleSessions } from '../hooks/useStats'
 import { useApp } from '../store'
 
 export function HeatmapPage() {
   const settings = useApp((s) => s.settings)
+  const active = useApp((s) => s.active)
   const now = useNow('minute')
   const daily = useLiveDaily(now)
   const sessions = useVisibleSessions()
   const today = dayKey(now)
   const [selected, setSelected] = useState<string | null>(null)
   const [editor, setEditor] = useState<EditorTarget>(null)
+
+  const live = useMemo(
+    () => (active ? { sessionId: active.sessionId, subjectId: active.subjectId, segments: liveSegments(active, now) } : null),
+    [active, now],
+  )
 
   // 起始日早于第一条记录时以设置为准；有更早的记录（补录）时自动向前扩展
   const from = useMemo(() => {
@@ -80,6 +87,7 @@ export function HeatmapPage() {
         day={editor ? null : selected}
         stat={selected ? daily.get(selected) : undefined}
         sessions={daySessions}
+        live={live}
         onClose={() => setSelected(null)}
         onEdit={(s) => setEditor({ kind: 'edit', session: s })}
         onAdd={(day) => setEditor({ kind: 'new', day })}
