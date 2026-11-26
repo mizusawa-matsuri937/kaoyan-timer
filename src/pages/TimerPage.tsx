@@ -1,8 +1,10 @@
-import { useMemo, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
+import { HEAT_VARS } from '../components/Heatmap'
 import { IconPause, IconPlay, IconStop } from '../components/icons'
 import { SubjectGrid } from '../components/SubjectGrid'
 import { TimerDisplay } from '../components/TimerDisplay'
 import { Button, Stat, tint } from '../components/ui'
+import { heatLevel, heatTierProgress, LEVEL_LABELS } from '../domain/aggregate'
 import { dayKey, diffDays } from '../domain/dates'
 import { formatDuration } from '../domain/format'
 import { getSubject } from '../domain/subjects'
@@ -14,12 +16,22 @@ import { THEME_GREEN } from '../lib/color'
 import { useSkin } from '../skin'
 import { pause, resume, selectSubjectAndStart, stop, useApp } from '../store'
 
+interface ArchiveFeedback {
+  id: number
+  subjectName: string
+  durationMs: number
+  level: 0 | 1 | 2 | 3 | 4
+  leveledUp: boolean
+  color: string
+}
+
 export function TimerPage() {
   const active = useApp((s) => s.active)
   const sessions = useApp((s) => s.sessions)
   const settings = useApp((s) => s.settings)
   const skin = useSkin()
   const running = !!active && active.runningSince !== null
+  const [archived, setArchived] = useState<ArchiveFeedback | null>(null)
   const now = useNow(active ? 'second' : 'minute')
   const daily = useLiveDaily(now)
   useWakeLock(settings.keepAwake && running)
@@ -37,6 +49,7 @@ export function TimerPage() {
   const todayStat = daily.get(today)
   const todayTotal = todayStat?.total ?? 0
   const countdown = diffDays(today, settings.examDate)
+  const tier = useMemo(() => heatTierProgress(todayTotal), [todayTotal])
 
   const subject = selected ? getSubject(selected) : undefined
   const color = subject?.color ?? THEME_GREEN
@@ -46,10 +59,32 @@ export function TimerPage() {
   const examMs = (subject?.examMinutes ?? 0) * 60000
   const over = !!active && examMs > 0 && ms >= examMs
 
+  useEffect(() => {
+    if (!archived) return
+    const timer = setTimeout(() => setArchived(null), 3200)
+    return () => clearTimeout(timer)
+  }, [archived])
+
+  const handleStop = () => {
+    if (active && ms >= 1000) {
+      const prevLevel = heatLevel(Math.max(0, todayTotal - ms))
+      const nextLevel = heatLevel(todayTotal)
+      setArchived({
+        id: Date.now(),
+        subjectName: subject?.short ?? subject?.name ?? '专注',
+        durationMs: ms,
+        level: nextLevel,
+        leveledUp: nextLevel > prevLevel,
+        color,
+      })
+    }
+    void stop()
+  }
+
   const onPick = (id: string) => {
     if (active) {
-      if (active.subjectId !== id) selectSubjectAndStart(id)
-      else if (!running) resume()
+      if (active.subjectId !== id) void selectSubjectAndStart(id)
+      else if (!running) void resume()
     } else {
       setPicked(id)
     }
@@ -58,11 +93,49 @@ export function TimerPage() {
   return (
     <div className="px-4 pb-6">
       <header className="grid grid-cols-2 gap-3 pt-2">
-        <Stat label={countdown >= 0 ? '距离初试' : '初试已过'} value={Math.abs(countdown)} unit="天" color="#f59e0b" />
-        <Stat label="今日已学" value={formatDuration(todayTotal)} color={active ? color : THEME_GREEN} />
+        <Stat
+          label={countdown >= 0 ? '距离初试' : '初试已过'}
+          value={Math.abs(countdown)}
+          unit="天"
+          color="#f59e0b"
+          footer={
+            <div className="stat-sub">
+              <div className="stat-meta num">
+                <span>初试 {settings.examDate}</span>
+              </div>
+            </div>
+          }
+        />
+        <Stat
+          label="今日已学"
+          value={formatDuration(todayTotal)}
+          color={active ? color : THEME_GREEN}
+          footer={
+            <div className="stat-sub">
+              <div className="heat-steps" aria-label={`今日热度：${LEVEL_LABELS[tier.level]}`}>
+                {tier.fills.map((fill, idx) => (
+                  <span key={idx} className="heat-step-cell">
+                    <i style={{ width: `${Math.round(fill * 100)}%`, background: HEAT_VARS[idx + 1] }} />
+                  </span>
+                ))}
+              </div>
+              <div className="stat-meta num">
+                <span>
+                  {tier.remainMs > 0 ? `再学 ${formatDuration(tier.remainMs)} 进 ${tier.nextTierLabel}` : tier.nextTierLabel}
+                </span>
+              </div>
+            </div>
+          }
+        />
       </header>
 
-      <section className="card timer c mt-3" style={tint(color)} data-state={state} data-over={over ? '' : undefined}>
+      <section
+        className="card timer c mt-3"
+        style={tint(archived && !active ? archived.color : color)}
+        data-state={state}
+        data-over={over ? '' : undefined}
+        data-archived={archived && !active ? '' : undefined}
+      >
         <div className="timer-head">
           <span className="prompt">
             {subject ? subject.name : '选择一个科目'}
@@ -74,7 +147,18 @@ export function TimerPage() {
           </span>
         </div>
 
-        <TimerDisplay ms={ms} active={!!active} skin={skin} examMs={examMs} />
+        <TimerDisplay ms={ms} active={!!active} running={running} skin={skin} examMs={examMs} />
+
+        {archived && !active && (
+          <div key={archived.id} className="finish-banner num" role="status">
+            <span className="heat-cell finish-swatch" style={{ background: HEAT_VARS[archived.level] }} aria-hidden />
+            <span>
+              已归档 {archived.subjectName} +{formatDuration(archived.durationMs)}
+              {' · '}
+              {archived.leveledUp ? `升至「${LEVEL_LABELS[archived.level]}」` : `今日「${LEVEL_LABELS[archived.level]}」`}
+            </span>
+          </div>
+        )}
 
         <div className="timer-controls" data-active={active ? '' : undefined}>
           {!active ? (
@@ -87,7 +171,7 @@ export function TimerPage() {
                 {running ? <IconPause size={18} /> : <IconPlay size={18} />}
                 {running ? '暂停' : '继续'}
               </Button>
-              <Button className="btn-lg" variant="secondary" onClick={stop}>
+              <Button className="btn-lg" variant="secondary" onClick={handleStop}>
                 <IconStop size={16} /> 结束
               </Button>
             </>

@@ -14,8 +14,10 @@ import {
 import { dayKey } from '../domain/dates'
 import { formatDuration, hours1 } from '../domain/format'
 import { GROUPS, subjectsOf } from '../domain/subjects'
+import { useAnimatedNumber } from '../hooks/useAnimatedNumber'
 import { useNow } from '../hooks/useNow'
 import { useLiveDaily } from '../hooks/useStats'
+import { useSkin } from '../skin'
 
 const RANGES: Array<{ value: RangeId; label: string }> = [
   { value: 'today', label: '今日' },
@@ -32,6 +34,7 @@ const TREND: Array<{ value: TrendUnit; label: string }> = [
 ]
 
 export function StatsPage() {
+  const skin = useSkin()
   const now = useNow('minute')
   const daily = useLiveDaily(now)
   const today = dayKey(now)
@@ -41,6 +44,7 @@ export function StatsPage() {
   const bySubject = useMemo(() => subjectTotals(daily, rangeBounds(range, today)), [daily, range, today])
   const byGroup = groupTotals(bySubject)
   const total = sumValues(bySubject)
+  const animatedTotal = useAnimatedNumber(total, skin)
   const st = useMemo(() => streaks(daily, today), [daily, today])
   const trendData = useMemo(() => trend(daily, today, unit, unit === 'day' ? 14 : 12), [daily, today, unit])
 
@@ -61,7 +65,7 @@ export function StatsPage() {
         <div>
           <div className="card-legend">考研总学习时长</div>
           <div className="num mt-1 text-[38px] leading-tight font-semibold">
-            {hours1(total)}
+            {hours1(animatedTotal)}
             <span className="ml-1.5 text-base font-medium text-muted">小时</span>
           </div>
           <div className="mt-4 flex items-center gap-4">

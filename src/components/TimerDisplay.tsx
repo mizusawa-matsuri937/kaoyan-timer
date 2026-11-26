@@ -110,9 +110,14 @@ const RING: Record<Exclude<SkinId, 'terminal'>, { width: number; edge: boolean }
   paper: { width: 3, edge: false },
 }
 
+const DIAL_60 = Array.from({ length: 60 }, (_, i) => {
+  const rad = (i / 60) * 2 * Math.PI
+  return { i, cos: Math.cos(rad), sin: Math.sin(rad), major: i % 5 === 0, quarter: i % 15 === 0 }
+})
+
 /**
  * 计时主体，形态跟随皮肤：
- * 终端极客 = 方块字符大字 + 分格进度条；新粗野 / 纸感文艺 = 圆环。每满一行 / 一圈 = 1 小时。
+ * 终端极客 = 方块字符大字 + 分格进度条；新粗野 / 纸感文艺 = 精细刻度圆环与运行呼吸。每满一行 / 一圈 = 1 小时。
  *
  * 传入 examMs（模拟测试）时改成倒计时：数字显示剩余时间，一行 / 一圈 = 整场考试；
  * 时间用完后数字变成超出的时长，由外层的 data-over 标红。
@@ -120,11 +125,13 @@ const RING: Record<Exclude<SkinId, 'terminal'>, { width: number; edge: boolean }
 export function TimerDisplay({
   ms,
   active,
+  running = active,
   skin,
   examMs = 0,
 }: {
   ms: number
   active: boolean
+  running?: boolean
   skin: SkinId
   examMs?: number
 }) {
@@ -161,6 +168,8 @@ export function TimerDisplay({
   const { width, edge } = RING[skin]
   // svg 整体旋转 -90°，所以 0° 在顶部
   const theta = progress * 2 * Math.PI
+  const tipX = 100 + R * Math.cos(theta)
+  const tipY = 100 + R * Math.sin(theta)
   const caption = exam
     ? active
       ? `${over ? '已超时' : '已用'} ${formatHMS(over ? ms - examMs : ms)}`
@@ -169,8 +178,46 @@ export function TimerDisplay({
       ? `第 ${lap + 1} 小时`
       : '每圈 1 小时'
   return (
-    <div className="dial">
+    <div className="dial" data-running={running ? '' : undefined}>
       <svg viewBox="0 0 200 200" aria-hidden>
+        {edge ? (
+          <>
+            <circle className="dial-breathe-ring" cx={100} cy={100} r={R - width / 2 - 9.5} />
+            <g className="dial-ticks-brutal">
+              {DIAL_60.filter((t) => t.major).map(({ i, cos, sin, quarter }) => {
+                const r1 = R - width / 2 - (quarter ? 7 : 4.5)
+                const r2 = R - width / 2 - 1.5
+                return (
+                  <line
+                    key={i}
+                    x1={100 + r1 * cos}
+                    y1={100 + r1 * sin}
+                    x2={100 + r2 * cos}
+                    y2={100 + r2 * sin}
+                    strokeWidth={quarter ? 2.2 : 1.4}
+                  />
+                )
+              })}
+            </g>
+          </>
+        ) : (
+          <g className="dial-ticks-paper">
+            {DIAL_60.map(({ i, cos, sin, major, quarter }) =>
+              major ? (
+                <line
+                  key={i}
+                  x1={100 + (R - (quarter ? 9.5 : 7)) * cos}
+                  y1={100 + (R - (quarter ? 9.5 : 7)) * sin}
+                  x2={100 + (R - 4) * cos}
+                  y2={100 + (R - 4) * sin}
+                  strokeWidth={quarter ? 1.15 : 0.75}
+                />
+              ) : (
+                <circle key={i} cx={100 + (R - 5.5) * cos} cy={100 + (R - 5.5) * sin} r={0.55} />
+              ),
+            )}
+          </g>
+        )}
         <circle className="dial-track" cx={100} cy={100} r={R} strokeWidth={width} />
         {lap > 0 && <circle className="dial-lap" cx={100} cy={100} r={R} strokeWidth={width} />}
         {active && progress > 0 && (
@@ -190,7 +237,12 @@ export function TimerDisplay({
             <circle className="dial-edge" cx={100} cy={100} r={R - width / 2} />
           </>
         ) : (
-          active && <circle className="dial-tip" cx={100 + R * Math.cos(theta)} cy={100 + R * Math.sin(theta)} r={4.5} />
+          active && (
+            <>
+              <circle className="dial-tip-halo" cx={tipX} cy={tipY} r={9} />
+              <circle className="dial-tip" cx={tipX} cy={tipY} r={4.5} />
+            </>
+          )
         )}
       </svg>
       <div className="dial-center">

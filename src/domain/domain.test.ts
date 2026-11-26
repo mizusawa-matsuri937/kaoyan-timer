@@ -5,6 +5,7 @@ import {
   dayTimelineSlices,
   groupTotals,
   heatLevel,
+  heatTierProgress,
   levelCounts,
   partitionRingSpans,
   sessionsOnDay,
@@ -353,5 +354,27 @@ describe('当日 24h 时间轴切片与圆环分区', () => {
     // 2 个学习段之间 1 个休息段 + 跨 00:00 合并的 1 个夜间休息段
     expect(restSpans).toHaveLength(2)
     expect(restSpans[1].endDeg - restSpans[1].startDeg).toBeGreaterThan(180)
+  })
+})
+
+describe('今日热度阶梯进度', () => {
+  it('heatTierProgress 四格填充比例、下一档文案与剩余时长同 heatLevel 严格对齐', () => {
+    expect(heatTierProgress(0).level).toBe(0)
+    expect(heatTierProgress(0).fills).toEqual([0, 0, 0, 0])
+    const l1 = heatTierProgress(30 * MIN)
+    expect(l1.level).toBe(1)
+    expect(l1.fills[0]).toBeCloseTo(0.5, 5)
+    expect(l1.nextTierLabel).toBe('1–5h')
+    expect(l1.remainMs).toBe(30 * MIN)
+    const l2 = heatTierProgress(3 * HOUR)
+    expect(l2.level).toBe(2)
+    expect(l2.fills[0]).toBe(1)
+    expect(l2.fills[1]).toBeCloseTo(0.5, 5)
+    expect(l2.nextTierLabel).toBe('5–10h')
+    expect(l2.remainMs).toBe(2 * HOUR)
+    const l4 = heatTierProgress(10 * HOUR)
+    expect(l4.level).toBe(4)
+    expect(l4.fills).toEqual([1, 1, 1, 1])
+    expect(l4.remainMs).toBe(0)
   })
 })

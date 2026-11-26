@@ -323,3 +323,44 @@ export function partitionRingSpans(
   }
   return { studySpans, restSpans }
 }
+
+export interface HeatTierProgress {
+  level: 0 | 1 | 2 | 3 | 4
+  /** 四格热度阶梯各自的填充比例 [0, 1] */
+  fills: [number, number, number, number]
+  /** 下一级热度档名称（与 LEVEL_LABELS 一致）；满格或未开始时为状态说明 */
+  nextTierLabel: string
+  remainMs: number
+}
+
+/** 计算当日学习时长在四级热度格（1h 以内 / 1–5h / 5–10h / 10h 以上）上的进度与距下一档差值 */
+export function heatTierProgress(ms: number): HeatTierProgress {
+  if (ms <= 0) {
+    return { level: 0, fills: [0, 0, 0, 0], nextTierLabel: '开始学习点亮首格', remainMs: 0 }
+  }
+  if (ms < HOUR) {
+    return {
+      level: 1,
+      fills: [Math.max(0.18, ms / HOUR), 0, 0, 0],
+      nextTierLabel: '1–5h',
+      remainMs: HOUR - ms,
+    }
+  }
+  if (ms < 5 * HOUR) {
+    return {
+      level: 2,
+      fills: [1, Math.max(0.12, (ms - HOUR) / (4 * HOUR)), 0, 0],
+      nextTierLabel: '5–10h',
+      remainMs: 5 * HOUR - ms,
+    }
+  }
+  if (ms < 10 * HOUR) {
+    return {
+      level: 3,
+      fills: [1, 1, Math.max(0.12, (ms - 5 * HOUR) / (5 * HOUR)), 0],
+      nextTierLabel: '10h 以上',
+      remainMs: 10 * HOUR - ms,
+    }
+  }
+  return { level: 4, fills: [1, 1, 1, 1], nextTierLabel: '已达最高热度', remainMs: 0 }
+}

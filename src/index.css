@@ -662,6 +662,8 @@ code {
 
   /* ---------- 数据展示 ---------- */
   .stat {
+    display: flex;
+    flex-direction: column;
     padding: 0.7rem 0.875rem 0.8rem;
     overflow: hidden;
   }
@@ -1872,6 +1874,265 @@ code {
     background: var(--c-soft);
     box-shadow: inset 3px 0 0 var(--c-mark, var(--accent));
   }
+
+  /* ---------- 计时页顶部「今日已学」热度阶梯进度 ---------- */
+  .stat-sub {
+    margin-top: auto;
+    padding-top: 0.5rem;
+  }
+  .stat-meta {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 0.35rem;
+    font-size: 11px;
+    line-height: 1.25;
+    color: var(--muted);
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+  .heat-steps {
+    display: grid;
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+    gap: 3px;
+    height: 5px;
+    margin-bottom: 0.32rem;
+  }
+  .heat-step-cell {
+    overflow: hidden;
+    border-radius: var(--r-cell);
+    background: var(--surface-3);
+  }
+  .heat-step-cell > i {
+    display: block;
+    height: 100%;
+    border-radius: inherit;
+    transition: width 0.35s ease-out;
+  }
+  [data-skin='terminal'] .heat-steps {
+    height: 6px;
+    gap: 2px;
+  }
+  [data-skin='terminal'] .heat-step-cell {
+    border-radius: 0;
+    border: 1px solid var(--line);
+  }
+  [data-skin='brutal'] .stat.c .stat-meta {
+    color: rgba(17, 17, 17, 0.74);
+    font-weight: 700;
+  }
+  [data-skin='brutal'] .stat.c .heat-steps {
+    height: 7px;
+    gap: 3px;
+  }
+  [data-skin='brutal'] .stat.c .heat-step-cell {
+    background: rgba(255, 255, 255, 0.72);
+    border: 1.5px solid #111111;
+    border-radius: 2px;
+  }
+  [data-skin='brutal'] .stat.c .heat-step-cell > i {
+    border-radius: 0;
+  }
+
+  /* ---------- 圆圈表盘精细刻度、运行呼吸与结束归档反馈 ---------- */
+  .dial-ticks-brutal line {
+    stroke: var(--border);
+    stroke-linecap: square;
+  }
+  .dial circle.dial-breathe-ring {
+    stroke: var(--c-fill);
+    stroke-width: 2px;
+    opacity: 0;
+  }
+  .dial[data-running] circle.dial-breathe-ring {
+    animation: brutal-ring-breathe 2.8s ease-in-out infinite;
+  }
+  .dial-ticks-paper line {
+    stroke: var(--muted);
+    opacity: 0.4;
+  }
+  .dial-ticks-paper circle {
+    fill: var(--faint);
+    opacity: 0.52;
+  }
+  .dial circle.dial-tip-halo {
+    fill: var(--c-mark);
+    opacity: 0.14;
+    transform-box: fill-box;
+    transform-origin: center;
+  }
+  .dial[data-running] circle.dial-tip-halo {
+    animation: halo-breathe 3s ease-in-out infinite;
+  }
+
+  .finish-banner {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 0.45rem;
+    margin-top: 0.9rem;
+    padding: 0.4rem 0.75rem;
+    border-radius: var(--r-pill);
+    background: var(--surface-2);
+    border: var(--bw) solid var(--line);
+    color: var(--text);
+    font-size: 12px;
+    font-weight: 500;
+  }
+  .finish-swatch {
+    width: 11px;
+    height: 11px;
+    flex-shrink: 0;
+  }
+  [data-skin='terminal'] .finish-banner {
+    border-color: var(--c-ink, var(--accent));
+    background: var(--c-soft);
+    color: var(--c-ink, var(--accent));
+    font-weight: 700;
+  }
+  [data-skin='brutal'] .finish-banner {
+    background: var(--c-fill);
+    border: 2px solid var(--border);
+    color: #111111;
+    font-weight: 800;
+    box-shadow: 2px 2px 0 var(--border);
+  }
+  [data-skin='brutal'] .finish-swatch {
+    box-shadow: 0 0 0 1.5px #111111;
+  }
+  [data-skin='paper'] .finish-banner {
+    background: var(--c-soft);
+    border-color: transparent;
+    color: var(--text);
+  }
+
+  /* ---------- 学习热度页：等级聚光灯 ---------- */
+  .heat-stage {
+    transition:
+      border-color 0.22s ease,
+      box-shadow 0.25s ease;
+  }
+  [data-skin='terminal'] .heat-stage[data-spot-active] {
+    border-color: var(--accent);
+  }
+  [data-skin='paper'] .heat-stage[data-spot-active] {
+    border-color: color-mix(in srgb, var(--accent) 38%, var(--border));
+    box-shadow: 0 10px 28px -14px color-mix(in srgb, var(--accent) 28%, transparent);
+  }
+
+  .heat-day {
+    transition:
+      transform 0.2s cubic-bezier(0.22, 1, 0.36, 1),
+      opacity 0.22s ease,
+      box-shadow 0.22s ease,
+      outline-color 0.18s ease;
+  }
+  [data-skin='terminal'] .heat-day {
+    transition:
+      opacity 0.12s steps(2),
+      outline-color 0.12s steps(2);
+  }
+  .heat-track[data-spot='0'] .heat-day:not([data-l='0']),
+  .heat-track[data-spot='1'] .heat-day:not([data-l='1']),
+  .heat-track[data-spot='2'] .heat-day:not([data-l='2']),
+  .heat-track[data-spot='3'] .heat-day:not([data-l='3']),
+  .heat-track[data-spot='4'] .heat-day:not([data-l='4']) {
+    opacity: 0.16;
+    transform: scale(0.9);
+    outline-color: transparent;
+  }
+  [data-skin='terminal'] .heat-track[data-spot='0'] .heat-day:not([data-l='0']),
+  [data-skin='terminal'] .heat-track[data-spot='1'] .heat-day:not([data-l='1']),
+  [data-skin='terminal'] .heat-track[data-spot='2'] .heat-day:not([data-l='2']),
+  [data-skin='terminal'] .heat-track[data-spot='3'] .heat-day:not([data-l='3']),
+  [data-skin='terminal'] .heat-track[data-spot='4'] .heat-day:not([data-l='4']) {
+    transform: none;
+  }
+  .heat-track[data-spot='0'] .heat-day[data-l='0'],
+  .heat-track[data-spot='1'] .heat-day[data-l='1'],
+  .heat-track[data-spot='2'] .heat-day[data-l='2'],
+  .heat-track[data-spot='3'] .heat-day[data-l='3'],
+  .heat-track[data-spot='4'] .heat-day[data-l='4'] {
+    position: relative;
+    z-index: 2;
+    transform: scale(1.06);
+    box-shadow:
+      0 0 0 1px var(--surface),
+      0 0 0 2.5px var(--accent),
+      0 2px 7px color-mix(in srgb, var(--accent) 32%, transparent);
+  }
+  [data-skin='terminal'] .heat-track[data-spot='0'] .heat-day[data-l='0'],
+  [data-skin='terminal'] .heat-track[data-spot='1'] .heat-day[data-l='1'],
+  [data-skin='terminal'] .heat-track[data-spot='2'] .heat-day[data-l='2'],
+  [data-skin='terminal'] .heat-track[data-spot='3'] .heat-day[data-l='3'],
+  [data-skin='terminal'] .heat-track[data-spot='4'] .heat-day[data-l='4'] {
+    transform: none;
+    box-shadow: none;
+    outline: 1.5px solid var(--accent);
+    outline-offset: 1px;
+  }
+  [data-skin='brutal'] .heat-track[data-spot='0'] .heat-day[data-l='0'],
+  [data-skin='brutal'] .heat-track[data-spot='1'] .heat-day[data-l='1'],
+  [data-skin='brutal'] .heat-track[data-spot='2'] .heat-day[data-l='2'],
+  [data-skin='brutal'] .heat-track[data-spot='3'] .heat-day[data-l='3'],
+  [data-skin='brutal'] .heat-track[data-spot='4'] .heat-day[data-l='4'] {
+    transform: translate(-1px, -1px) scale(1.04);
+    box-shadow: 2px 2px 0 var(--border);
+    outline: 1.5px solid var(--border);
+    outline-offset: 0;
+  }
+
+  .heat-spot-status {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.35rem;
+    padding: 0;
+    background: transparent;
+    font-size: 11px;
+    line-height: 1.25;
+    font-weight: 500;
+    color: var(--text);
+  }
+  .heat-spot-clear {
+    color: var(--accent);
+    margin-left: 0.15rem;
+  }
+
+  .heat-lvl-row {
+    transition:
+      background-color 0.18s ease,
+      opacity 0.2s ease,
+      box-shadow 0.18s ease;
+  }
+  .heat-lvl-row:active {
+    background: var(--surface-2);
+  }
+  .heat-lvl-list[data-has-spot] .heat-lvl-row:not([aria-pressed='true']) {
+    opacity: 0.46;
+  }
+  .heat-lvl-row[aria-pressed='true'] {
+    background: var(--accent-soft);
+    box-shadow: inset 3px 0 0 var(--accent);
+  }
+  .heat-lvl-row[aria-pressed='true'] .heat-lvl-swatch {
+    box-shadow:
+      0 0 0 1.5px var(--surface),
+      0 0 0 3px var(--accent);
+  }
+  [data-skin='terminal'] .heat-lvl-row[aria-pressed='true'] .heat-lvl-swatch {
+    box-shadow: none;
+    outline: 1.5px solid var(--accent);
+    outline-offset: 1px;
+  }
+  [data-skin='brutal'] .heat-lvl-row[aria-pressed='true'] {
+    background: var(--surface-2);
+    font-weight: 700;
+  }
+  [data-skin='brutal'] .heat-lvl-row[aria-pressed='true'] .heat-lvl-swatch {
+    box-shadow: 2px 2px 0 var(--border);
+    outline: 1.5px solid var(--border);
+  }
 }
 
 /* 图表描边（新粗野用），recharts 的扇区 / 柱子 */
@@ -1903,6 +2164,26 @@ code {
   }
   50% {
     opacity: 0.35;
+  }
+}
+@keyframes halo-breathe {
+  0%,
+  100% {
+    opacity: 0.08;
+    transform: scale(0.92);
+  }
+  50% {
+    opacity: 0.25;
+    transform: scale(1.12);
+  }
+}
+@keyframes brutal-ring-breathe {
+  0%,
+  100% {
+    opacity: 0.06;
+  }
+  50% {
+    opacity: 0.24;
   }
 }
 @media (prefers-reduced-motion: reduce) {

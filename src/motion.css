@@ -197,6 +197,14 @@ html[data-skin='terminal'] .page-in > div > h1.page-title {
   animation: var(--m-ctl) 0.2s var(--m-enter-ease) backwards;
 }
 
+/* 结束专注归档时的正向反馈条与卡片回弹 */
+.finish-banner {
+  animation: var(--m-enter) var(--m-enter-dur) var(--m-enter-ease) backwards;
+}
+html[data-skin='brutal'] .timer[data-archived] {
+  animation: m-brutal-settle 0.28s cubic-bezier(0.3, 1.6, 0.5, 1);
+}
+
 /* ===================== 关键帧 ===================== */
 @keyframes m-rise {
   from {
@@ -292,6 +300,14 @@ html[data-skin='terminal'] .page-in > div > h1.page-title {
   from {
     opacity: 0;
     transform: scale(1.6);
+  }
+}
+@keyframes m-brutal-settle {
+  0% {
+    transform: translate(2px, 2px);
+  }
+  100% {
+    transform: translate(0, 0);
   }
 }
 

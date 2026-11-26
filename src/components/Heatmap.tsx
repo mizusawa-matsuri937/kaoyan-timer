@@ -1,6 +1,7 @@
-import { memo, useLayoutEffect, useMemo, useRef, useState, type CSSProperties, type MouseEvent, type ReactNode } from 'react'
+import { memo, useEffect, useLayoutEffect, useMemo, useRef, useState, type CSSProperties, type MouseEvent, type ReactNode } from 'react'
 import { heatLevel, type Daily } from '../domain/aggregate'
 import { addDays, diffDays, parseDay, startOfWeek } from '../domain/dates'
+import { useSkin } from '../skin'
 
 /** 格子的最小边长；实际边长按容器宽度略微放大，让可视区正好容纳整数列 */
 const MIN_CELL = 18
@@ -23,11 +24,21 @@ interface Props {
   to: string
   today: string
   selected: string | null
+  spotlightLevel?: number | null
   onSelect: (day: string) => void
 }
 
 /** GitHub 风格热度表：列 = 周（周一开始），行 = 周一…周日 */
-export const Heatmap = memo(function Heatmap({ daily, from, to, today, selected, onSelect }: Props) {
+export const Heatmap = memo(function Heatmap({
+  daily,
+  from,
+  to,
+  today,
+  selected,
+  spotlightLevel = null,
+  onSelect,
+}: Props) {
+  const skin = useSkin()
   const scrollRef = useRef<HTMLDivElement>(null)
   const [viewW, setViewW] = useState(0)
 
@@ -68,7 +79,7 @@ export const Heatmap = memo(function Heatmap({ daily, from, to, today, selected,
     return { cols, gridStart, months }
   }, [from, to])
 
-  // 列内容与选中状态无关：点格子时这几百个节点不需要重新渲染
+  // 列内容与选中 / 聚光状态无关：切换聚光时这几百个节点不需要重新渲染
   const columns = useMemo(() => {
     const out: ReactNode[] = []
     for (let c = 0; c < cols; c++) {
@@ -137,6 +148,36 @@ export const Heatmap = memo(function Heatmap({ daily, from, to, today, selected,
     syncMonths()
   }, [todayCol, visible, step, viewW, months])
 
+  // 开启某个等级聚光时，若当前可视区里恰好没有任何该等级的格子，则自动滚到最近一个有该等级的列
+  useEffect(() => {
+    if (spotlightLevel == null || viewW === 0) return
+    const el = scrollRef.current
+    if (!el) return
+    const countEnd = today < to ? today : to
+    const matchingCols: number[] = []
+    const totalDays = diffDays(from, countEnd)
+    for (let i = 0; i <= totalDays; i++) {
+      const d = addDays(from, i)
+      if (heatLevel(daily.get(d)?.total ?? 0) === spotlightLevel) {
+        const col = Math.floor(diffDays(gridStart, d) / 7)
+        if (matchingCols[matchingCols.length - 1] !== col) matchingCols.push(col)
+      }
+    }
+    if (matchingCols.length === 0) return
+    const lo = el.scrollLeft
+    const hi = el.scrollLeft + el.clientWidth
+    const anyVisible = matchingCols.some((c) => {
+      const x = PAD + c * step
+      return x + step - GAP > lo + 2 && x < hi - 2
+    })
+    if (!anyVisible) {
+      const targetCol = matchingCols[matchingCols.length - 1]
+      const targetLeft = Math.max(0, targetCol - Math.floor(visible / 2)) * step
+      const reduced = window.matchMedia?.('(prefers-reduced-motion: reduce)').matches
+      el.scrollTo({ left: targetLeft, behavior: reduced || skin === 'terminal' ? 'auto' : 'smooth' })
+    }
+  }, [spotlightLevel, viewW, from, to, today, daily, gridStart, step, visible, skin])
+
   const onScroll = () => {
     const el = scrollRef.current
     // 隐藏时宽度为 0，那时的清零不是用户滚的，不记
@@ -162,7 +203,11 @@ export const Heatmap = memo(function Heatmap({ daily, from, to, today, selected,
         ))}
       </div>
       <div ref={scrollRef} className="heat-scroll no-scrollbar" onScroll={onScroll}>
-        <div className="heat-track" onClick={onClick}>
+        <div
+          className="heat-track"
+          data-spot={spotlightLevel != null ? String(spotlightLevel) : undefined}
+          onClick={onClick}
+        >
           {columns}
           {sel >= 0 && (
             <span className="heat-ring" style={{ '--c': Math.floor(sel / 7), '--r': sel % 7 } as CSSProperties} />

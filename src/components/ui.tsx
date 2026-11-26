@@ -1,9 +1,16 @@
-import { AnimatePresence, motion, useDragControls } from 'framer-motion'
+import { AnimatePresence, motion, useDragControls, type Transition } from 'framer-motion'
 import { useEffect, type CSSProperties, type InputHTMLAttributes, type ReactNode } from 'react'
+import { useSkin, type SkinId } from '../skin'
 import { useApp } from '../store'
 
 /** 把科目色交给 CSS：配合 .c 类，由当前皮肤决定怎么用这个颜色 */
 export const tint = (color: string) => ({ '--c': color }) as CSSProperties
+
+const SHEET_TRANSITION: Record<SkinId, Transition> = {
+  terminal: { duration: 0.16, ease: 'linear' },
+  brutal: { type: 'spring', damping: 24, stiffness: 460 },
+  paper: { duration: 0.36, ease: [0.22, 1, 0.36, 1] },
+}
 
 /** 底部弹出面板 */
 export function Sheet({
@@ -17,6 +24,7 @@ export function Sheet({
   title?: ReactNode
   children: ReactNode
 }) {
+  const skin = useSkin()
   const controls = useDragControls()
   useEffect(() => {
     if (!open) return
@@ -35,14 +43,14 @@ export function Sheet({
             className="absolute inset-0"
             style={{ background: 'var(--backdrop)' }}
             variants={{ hidden: { opacity: 0 }, show: { opacity: 1 } }}
-            transition={{ duration: 0.18 }}
+            transition={{ duration: skin === 'paper' ? 0.26 : 0.16 }}
             onClick={onClose}
           />
           <motion.div
             className="sheet safe-bottom relative w-full max-w-lg"
             style={{ maxHeight: '88dvh' }}
             variants={{ hidden: { y: '100%' }, show: { y: 0 } }}
-            transition={{ type: 'spring', damping: 34, stiffness: 420 }}
+            transition={SHEET_TRANSITION[skin]}
             drag="y"
             dragListener={false}
             dragControls={controls}
@@ -165,6 +173,7 @@ export function Stat({
   unit,
   color,
   icon,
+  footer,
   className = '',
   compact = false,
 }: {
@@ -173,6 +182,7 @@ export function Stat({
   unit?: string
   color: string
   icon?: ReactNode
+  footer?: ReactNode
   className?: string
   compact?: boolean
 }) {
@@ -186,6 +196,7 @@ export function Stat({
         {value}
         {unit && <span className="stat-unit">{unit}</span>}
       </div>
+      {footer}
     </div>
   )
 }
