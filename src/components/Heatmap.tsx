@@ -192,6 +192,22 @@ export const Heatmap = memo(function Heatmap({
 
   const sel = selected && selected >= from && selected <= to ? diffDays(gridStart, selected) : -1
 
+  // 在详情面板内前后翻天时，若选中的列超出了可视区则平滑跟随
+  useEffect(() => {
+    if (sel < 0 || viewW === 0) return
+    const el = scrollRef.current
+    if (!el) return
+    const col = Math.floor(sel / 7)
+    const x = PAD + col * step
+    const lo = el.scrollLeft
+    const hi = lo + el.clientWidth
+    if (x < lo + 2 || x + step - GAP > hi - 2) {
+      const targetLeft = Math.max(0, col - Math.floor(visible / 2)) * step
+      const reduced = window.matchMedia?.('(prefers-reduced-motion: reduce)').matches
+      el.scrollTo({ left: targetLeft, behavior: reduced || skin === 'terminal' ? 'auto' : 'smooth' })
+    }
+  }, [sel, viewW, step, visible, skin])
+
   return (
     <div className="heat" style={{ '--cell': `${step - GAP}px`, '--step': `${step}px` } as CSSProperties}>
       {/* 星期标签固定在左侧，不随横向滚动 */}

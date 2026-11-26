@@ -1,9 +1,11 @@
-import { useEffect, useMemo, useState } from 'react'
+import { AnimatePresence, motion } from 'framer-motion'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import { dayTimelineSlices, heatLevel, LEVEL_LABELS, splitByDay, type DayStat, type LiveSliceInput } from '../domain/aggregate'
-import { formatClock, formatDayCN } from '../domain/dates'
+import { addDays, formatClock, formatDayCN } from '../domain/dates'
 import { formatDuration, formatDurationCN } from '../domain/format'
 import { SUBJECTS, getSubject } from '../domain/subjects'
 import type { Session } from '../domain/types'
+import { useSkin } from '../skin'
 import { DayTimelineRing } from './DayTimelineRing'
 import { HEAT_VARS } from './Heatmap'
 import { IconChevron, IconPlus } from './icons'
@@ -14,6 +16,9 @@ export function DaySheet({
   stat,
   sessions,
   live,
+  minDay,
+  maxDay,
+  onSelectDay,
   onClose,
   onEdit,
   onAdd,
@@ -22,12 +27,22 @@ export function DaySheet({
   stat: DayStat | undefined
   sessions: Session[]
   live?: LiveSliceInput | null
+  minDay?: string
+  maxDay?: string
+  onSelectDay?: (day: string) => void
   onClose: () => void
   onEdit: (s: Session) => void
   onAdd: (day: string) => void
 }) {
+  const skin = useSkin()
   const [selectedSliceKey, setSelectedSliceKey] = useState<string | null>(null)
+  const prevDayRef = useRef<string | null>(day)
+  let dayDir: -1 | 0 | 1 = 0
+  if (day && prevDayRef.current && day !== prevDayRef.current) {
+    dayDir = day > prevDayRef.current ? 1 : -1
+  }
   useEffect(() => {
+    prevDayRef.current = day
     setSelectedSliceKey(null)
   }, [day])
 
@@ -48,12 +63,57 @@ export function DaySheet({
     [stat],
   )
   const max = rows[0]?.ms ?? 1
+  const canPrev = !!(day && onSelectDay && (!minDay || day > minDay))
+  const canNext = !!(day && onSelectDay && (!maxDay || day < maxDay))
+
+  const titleNode = day ? (
+    <div className="flex items-center justify-between gap-2">
+      <span>{formatDayCN(day)}</span>
+      {onSelectDay && (
+        <div className="flex items-center gap-1">
+          <button
+            type="button"
+            disabled={!canPrev}
+            onClick={() => day && canPrev && onSelectDay(addDays(day, -1))}
+            aria-label="前一天"
+            className="day-ring-step disabled:opacity-35"
+          >
+            {skin === 'terminal' ? '<' : '‹'}
+          </button>
+          <button
+            type="button"
+            disabled={!canNext}
+            onClick={() => day && canNext && onSelectDay(addDays(day, 1))}
+            aria-label="后一天"
+            className="day-ring-step disabled:opacity-35"
+          >
+            {skin === 'terminal' ? '>' : '›'}
+          </button>
+        </div>
+      )}
+    </div>
+  ) : (
+    ''
+  )
 
   return (
-    <Sheet open={!!day} onClose={onClose} title={day ? formatDayCN(day) : ''}>
+    <Sheet open={!!day} onClose={onClose} title={titleNode}>
       {day && (
-        <>
-          <div className="well flex items-center gap-3 p-4">
+        <AnimatePresence mode="wait" initial={false}>
+          <motion.div
+            key={day}
+            initial={dayDir === 0 ? false : { opacity: 0, x: dayDir * 18 }}
+            animate={{ opacity: 1, x: 0 }}
+            exit={{ opacity: 0, x: dayDir * -14 }}
+            transition={
+              skin === 'terminal'
+                ? { duration: 0.1, ease: 'linear' }
+                : skin === 'brutal'
+                  ? { duration: 0.18, ease: [0.25, 1.3, 0.5, 1] }
+                  : { duration: 0.22, ease: [0.22, 1, 0.36, 1] }
+            }
+          >
+            <div className="well flex items-center gap-3 p-4">
             <span className="heat-cell h-9 w-9 shrink-0" style={{ background: HEAT_VARS[lvl] }} />
             <div>
               <div className="num text-2xl font-semibold">{formatDurationCN(total)}</div>
@@ -137,7 +197,8 @@ export function DaySheet({
               })}
             </div>
           )}
-        </>
+          </motion.div>
+        </AnimatePresence>
       )}
     </Sheet>
   )

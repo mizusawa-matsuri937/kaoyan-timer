@@ -71,8 +71,8 @@ export function HeatmapPage() {
           spotlightLevel={spotlight}
           onSelect={setSelected}
         />
-        <div className="mt-3 flex items-center justify-between gap-2">
-          {spotlight !== null ? (
+        <div className={`mt-3 flex items-center gap-2 ${spotlight !== null ? 'justify-between' : 'justify-end'}`}>
+          {spotlight !== null && (
             <button type="button" className="heat-spot-status" onClick={() => setSpotlight(null)}>
               <span className="heat-cell inline-block h-2.5 w-2.5 shrink-0" style={{ background: HEAT_VARS[spotlight] }} />
               <span>
@@ -82,8 +82,6 @@ export function HeatmapPage() {
               </span>
               <span className="heat-spot-clear">还原</span>
             </button>
-          ) : (
-            <span className="text-[11px] text-muted">点格子查看当天详情</span>
           )}
           <HeatLegend />
         </div>
@@ -101,7 +99,9 @@ export function HeatmapPage() {
             <button type="button" className="text-xs font-medium text-accent" onClick={() => setSpotlight(null)}>
               退出聚光
             </button>
-          ) : undefined
+          ) : (
+            <span className="num text-xs text-muted">至今 {passedDays} 天</span>
+          )
         }
       >
         各等级天数
@@ -132,13 +132,15 @@ export function HeatmapPage() {
           )
         })}
       </div>
-      <p className="mt-2 px-1 text-xs text-faint">统计范围：备考第一天至今天，共 {passedDays} 天</p>
 
       <DaySheet
         day={editor ? null : selected}
         stat={selected ? daily.get(selected) : undefined}
         sessions={daySessions}
         live={live}
+        minDay={from}
+        maxDay={countTo}
+        onSelectDay={setSelected}
         onClose={() => setSelected(null)}
         onEdit={(s) => setEditor({ kind: 'edit', session: s })}
         onAdd={(day) => setEditor({ kind: 'new', day })}

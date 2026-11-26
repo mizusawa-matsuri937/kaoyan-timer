@@ -1,4 +1,4 @@
-import { Activity, lazy, Suspense, useEffect, useLayoutEffect, useRef, useState, type ReactNode } from 'react'
+import { Activity, lazy, Suspense, useEffect, useLayoutEffect, useRef, useState, type CSSProperties, type ReactNode } from 'react'
 import { ErrorBoundary } from './components/ErrorBoundary'
 import { OvertimeDialog } from './components/OvertimeDialog'
 import { TabBar, type TabId } from './components/TabBar'
@@ -39,22 +39,27 @@ const PAGES: Array<{ id: TabId; node: ReactNode }> = [
   { id: 'settings', node: <SettingsPage /> },
 ]
 
+const TAB_ORDER: TabId[] = ['timer', 'heat', 'stats', 'settings']
+
 export function App() {
   const loaded = useApp((s) => s.loaded)
   const fatal = useApp((s) => s.fatal)
   const running = useApp((s) => !!s.active && s.active.runningSince !== null)
   const [tab, setTab] = useState<TabId>(loadTab)
+  const [tabDir, setTabDir] = useState<-1 | 0 | 1>(0)
   useExamAlarm()
   // 页面切走后不卸载，各自的纵向滚动位置也要记住（所有页面共用 window 的滚动条）
   const scrollTops = useRef<Partial<Record<TabId, number>>>({})
 
   const changeTab = (next: TabId) => {
     if (next === tab) {
-      // 再点一次当前标签 = 回到顶部
-      window.scrollTo({ top: 0 })
+      // 再点一次当前标签 = 平滑回到顶部
+      const reduced = window.matchMedia?.('(prefers-reduced-motion: reduce)').matches
+      window.scrollTo({ top: 0, behavior: reduced ? 'auto' : 'smooth' })
       return
     }
     scrollTops.current[tab] = window.scrollY
+    setTabDir(TAB_ORDER.indexOf(next) > TAB_ORDER.indexOf(tab) ? 1 : -1)
     setTab(next)
   }
 
@@ -89,7 +94,10 @@ export function App() {
   }
 
   return (
-    <div className="mx-auto min-h-full max-w-lg safe-top" style={{ paddingBottom: 'calc(env(safe-area-inset-bottom) + 96px)' }}>
+    <div
+      className="mx-auto min-h-full max-w-lg safe-top"
+      style={{ paddingBottom: 'calc(env(safe-area-inset-bottom) + 96px)', '--tab-dir': tabDir } as CSSProperties}
+    >
       {/*
         四个页面一直挂着，只有当前页可见：切回来不用重建节点，页内状态（范围选择、热度表滚到哪）也都还在。
         隐藏的页面由 React 用空闲时间预渲染，副作用（每秒的计时刷新等）在隐藏期间是停掉的。

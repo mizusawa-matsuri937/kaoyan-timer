@@ -75,11 +75,17 @@ function commit() {
 
 let vtSeq = 0
 
+export interface TransitionOrigin {
+  x: number
+  y: number
+}
+
 /**
  * 用户自己换皮肤 / 明暗时，带一段整屏过渡（View Transitions：前后两帧是浏览器截的图，过渡期间页面不重排）。
- * 用哪种过渡由 CSS 令牌 --m-vt 决定（见 motion.css）；浏览器不支持、令牌是 none、或系统开了减弱动态效果时直接切换。
+ * 用哪种过渡由 CSS 令牌 --m-vt 决定（见 motion.css）；传入点击坐标时从指尖位置径向铺开；
+ * 浏览器不支持、令牌是 none、或系统开了减弱动态效果时直接切换。
  */
-function commitAnimated() {
+function commitAnimated(origin?: TransitionOrigin) {
   const root = document.documentElement
   const kind = () => getComputedStyle(root).getPropertyValue('--m-vt').trim()
   if (
@@ -91,6 +97,13 @@ function commitAnimated() {
     commit()
     return
   }
+  const x = origin?.x ?? window.innerWidth / 2
+  const y = origin?.y ?? window.innerHeight / 2
+  const maxR = Math.hypot(Math.max(x, window.innerWidth - x), Math.max(y, window.innerHeight - y))
+  root.style.setProperty('--vt-x', `${Math.round(x)}px`)
+  root.style.setProperty('--vt-y', `${Math.round(y)}px`)
+  root.style.setProperty('--vt-r', `${Math.ceil(maxR)}px`)
+
   const vt = document.startViewTransition(() => {
     // 新画面要在这个回调里同步画完，所以让 React 立刻提交
     flushSync(commit)
@@ -100,7 +113,12 @@ function commitAnimated() {
   // 过渡还没播完又换了一次时，前一次会被浏览器跳过：不算错误，也别把后一次的标记清掉
   const seq = ++vtSeq
   const done = () => {
-    if (seq === vtSeq) delete root.dataset.vt
+    if (seq === vtSeq) {
+      delete root.dataset.vt
+      root.style.removeProperty('--vt-x')
+      root.style.removeProperty('--vt-y')
+      root.style.removeProperty('--vt-r')
+    }
   }
   vt.ready.catch(() => {})
   vt.finished.then(done, done)
@@ -135,18 +153,18 @@ export function initSkin() {
   })
 }
 
-export function setSkin(next: SkinId) {
+export function setSkin(next: SkinId, origin?: TransitionOrigin) {
   if (next === skin) return
   skin = next
   write(SKIN_KEY, next)
-  commitAnimated()
+  commitAnimated(origin)
 }
 
-export function setMode(next: ModeId) {
+export function setMode(next: ModeId, origin?: TransitionOrigin) {
   if (next === mode) return
   mode = next
   write(MODE_KEY, next)
-  commitAnimated()
+  commitAnimated(origin)
 }
 
 const subscribe = (cb: () => void) => {

@@ -17,7 +17,12 @@ import { GROUPS, subjectsOf } from '../domain/subjects'
 import { useAnimatedNumber } from '../hooks/useAnimatedNumber'
 import { useNow } from '../hooks/useNow'
 import { useLiveDaily } from '../hooks/useStats'
-import { useSkin } from '../skin'
+import { useSkin, type SkinId } from '../skin'
+
+function AnimatedDuration({ ms, skin }: { ms: number; skin: SkinId }) {
+  const animated = useAnimatedNumber(ms, skin)
+  return <>{formatDuration(animated)}</>
+}
 
 const RANGES: Array<{ value: RangeId; label: string }> = [
   { value: 'today', label: '今日' },
@@ -84,7 +89,7 @@ export function StatsPage() {
       </div>
 
       {GROUPS.map((g) => {
-        const subs = subjectsOf(g.id)
+        const subs = subjectsOf(g.id).filter((s) => !s.examMinutes || (bySubject[s.id] ?? 0) > 0)
         const groupMs = byGroup[g.id]
         return (
           <div key={g.id} className="card c mt-3 p-4" style={tint(g.color)}>
@@ -93,7 +98,9 @@ export function StatsPage() {
                 <span className="dot" />
                 <span className="text-[16px] font-semibold">{subs.length > 1 ? `${g.name} 汇总` : g.name}</span>
               </div>
-              <span className="num text-xl font-semibold">{formatDuration(groupMs)}</span>
+              <span className="num text-xl font-semibold">
+                <AnimatedDuration ms={groupMs} skin={skin} />
+              </span>
             </div>
             {subs.length > 1 && (
               <div className="mt-3 space-y-3">

@@ -3,6 +3,10 @@ import { Bar, BarChart, Cell, Pie, PieChart, ResponsiveContainer, Tooltip, XAxis
 import type { TrendPoint } from '../domain/aggregate'
 import { formatDuration } from '../domain/format'
 import { GROUPS } from '../domain/subjects'
+import { useAnimatedNumber } from '../hooks/useAnimatedNumber'
+import { useSkin } from '../skin'
+
+const skinColor = (hex: string) => `color-mix(in srgb, ${hex} var(--c-mark-pct), var(--c-ink-to))`
 
 const tooltipStyle = {
   background: 'var(--surface)',
@@ -30,11 +34,18 @@ function useShowCount() {
 
 export function ShareDonut({ data }: { data: Array<{ name: string; value: number; color: string }> }) {
   // 图表库的入场动画只在挂载时播一次；页面里其他区块每次切回来都会重播入场，
-  // 所以这里也让扇区跟着重新挂载、再转一圈
+  // 所以这里也让扇区跟着重新挂载；而在本页切换「今日/本周/本月/全部」时零延迟立即响应
+  const skin = useSkin()
   const replay = useShowCount()
+  const prevReplay = useRef(replay)
+  const isReplay = prevReplay.current !== replay
+  prevReplay.current = replay
+
   const total = data.reduce((a, d) => a + d.value, 0)
+  const animatedTotal = useAnimatedNumber(total, skin)
   const shown = data.filter((d) => d.value > 0)
   const hasData = shown.length > 0
+  const dur = skin === 'terminal' ? 220 : skin === 'brutal' ? 320 : 420
   return (
     <div className="relative h-40 w-40 shrink-0">
       <ResponsiveContainer width="100%" height="100%">
@@ -46,27 +57,31 @@ export function ShareDonut({ data }: { data: Array<{ name: string; value: number
             innerRadius="72%"
             outerRadius="100%"
             paddingAngle={shown.length > 1 ? 2 : 0}
-            cornerRadius={2}
+            cornerRadius={skin === 'terminal' ? 0 : 2}
             stroke="none"
             isAnimationActive
-            animationBegin={200}
-            animationDuration={450}
+            animationBegin={isReplay ? 100 : 0}
+            animationDuration={dur}
+            animationEasing="ease-out"
           >
-            {(hasData ? shown : [{ color: 'var(--surface-3)' }]).map((d, i) => (
-              <Cell key={i} fill={d.color} />
+            {(hasData ? shown : [{ color: 'var(--surface-3)', raw: true }]).map((d, i) => (
+              <Cell key={i} fill={'raw' in d ? d.color : skinColor(d.color)} />
             ))}
           </Pie>
         </PieChart>
       </ResponsiveContainer>
       <div className="pointer-events-none absolute inset-0 flex flex-col items-center justify-center">
         <div className="text-[11px] text-muted">合计</div>
-        <div className="num text-lg font-semibold">{formatDuration(total)}</div>
+        <div className="num text-lg font-semibold">{formatDuration(animatedTotal)}</div>
       </div>
     </div>
   )
 }
 
 export function TrendChart({ data }: { data: TrendPoint[] }) {
+  const skin = useSkin()
+  const replay = useShowCount()
+  const dur = skin === 'terminal' ? 200 : skin === 'brutal' ? 300 : 380
   const rows = data.map((p) => ({
     label: p.label,
     cs408: +(p.cs408 / 3600000).toFixed(2),
@@ -77,7 +92,7 @@ export function TrendChart({ data }: { data: TrendPoint[] }) {
   return (
     <div className="h-52 w-full">
       <ResponsiveContainer width="100%" height="100%">
-        <BarChart data={rows} margin={{ top: 8, right: 4, left: -18, bottom: 0 }}>
+        <BarChart key={replay} data={rows} margin={{ top: 8, right: 4, left: -18, bottom: 0 }}>
           <XAxis
             dataKey="label"
             tick={{ fontSize: 10, fill: 'var(--muted)' }}
@@ -97,9 +112,10 @@ export function TrendChart({ data }: { data: TrendPoint[] }) {
               key={g.id}
               dataKey={g.id}
               stackId="a"
-              fill={g.color}
-              radius={i === GROUPS.length - 1 ? [2, 2, 0, 0] : 0}
-              animationDuration={400}
+              fill={skinColor(g.color)}
+              radius={skin === 'terminal' ? 0 : i === GROUPS.length - 1 ? [2, 2, 0, 0] : 0}
+              animationDuration={dur}
+              animationEasing="ease-out"
             />
           ))}
         </BarChart>

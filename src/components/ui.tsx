@@ -1,15 +1,27 @@
 import { AnimatePresence, motion, useDragControls, type Transition } from 'framer-motion'
-import { useEffect, type CSSProperties, type InputHTMLAttributes, type ReactNode } from 'react'
-import { useSkin, type SkinId } from '../skin'
-import { useApp } from '../store'
+import { useEffect, type CSSProperties, type InputHTMLAttributes, type MouseEvent, type ReactNode } from 'react'
+import { useSkin, type SkinId, type TransitionOrigin } from '../skin'
+import { dismissToast, useApp } from '../store'
 
 /** 把科目色交给 CSS：配合 .c 类，由当前皮肤决定怎么用这个颜色 */
 export const tint = (color: string) => ({ '--c': color }) as CSSProperties
 
 const SHEET_TRANSITION: Record<SkinId, Transition> = {
-  terminal: { duration: 0.16, ease: 'linear' },
-  brutal: { type: 'spring', damping: 24, stiffness: 460 },
-  paper: { duration: 0.36, ease: [0.22, 1, 0.36, 1] },
+  terminal: { duration: 0.16, ease: [0.16, 1, 0.3, 1] },
+  brutal: { type: 'spring', damping: 28, stiffness: 460, mass: 0.9 },
+  paper: { duration: 0.38, ease: [0.22, 1, 0.36, 1] },
+}
+
+const TOAST_TRANSITION: Record<SkinId, Transition> = {
+  terminal: { duration: 0.12, ease: 'linear' },
+  brutal: { type: 'spring', damping: 22, stiffness: 520 },
+  paper: { duration: 0.28, ease: [0.22, 1, 0.36, 1] },
+}
+
+export function clickOrigin(e: MouseEvent<HTMLElement>): TransitionOrigin {
+  if (e.clientX !== 0 || e.clientY !== 0) return { x: e.clientX, y: e.clientY }
+  const r = e.currentTarget.getBoundingClientRect()
+  return { x: r.left + r.width / 2, y: r.top + r.height / 2 }
 }
 
 /** 底部弹出面板 */
@@ -83,14 +95,19 @@ export function Segmented<T extends string>({
 }: {
   value: T
   options: Array<{ value: T; label: string }>
-  onChange: (v: T) => void
+  onChange: (v: T, origin?: TransitionOrigin) => void
 }) {
   // 选中项的底色是一块会滑动的滑块（.seg::before），位置由这两个变量决定
   const index = options.findIndex((o) => o.value === value)
   return (
     <div className="seg" style={{ '--seg-n': options.length, '--seg-i': index } as CSSProperties} data-none={index < 0 ? '' : undefined}>
       {options.map((o) => (
-        <button key={o.value} onClick={() => onChange(o.value)} aria-pressed={value === o.value} className="seg-item">
+        <button
+          key={o.value}
+          onClick={(e) => onChange(o.value, clickOrigin(e))}
+          aria-pressed={value === o.value}
+          className="seg-item"
+        >
           {o.label}
         </button>
       ))}
@@ -135,21 +152,35 @@ export function DateTimeField({ className = '', ...props }: Omit<InputHTMLAttrib
 
 export function ToastHost() {
   const toast = useApp((s) => s.toast)
+  const skin = useSkin()
   return (
     <div className="pointer-events-none fixed inset-x-0 z-[60] flex justify-center px-4" style={{ top: 'max(env(safe-area-inset-top), 12px)' }}>
-      <AnimatePresence>
+      <AnimatePresence mode="popLayout">
         {toast && (
           <motion.div
             key={toast.id}
-            initial={{ opacity: 0, y: -12 }}
-            animate={{ opacity: 1, y: 0 }}
-            exit={{ opacity: 0, y: -8 }}
-            transition={{ duration: 0.16, ease: 'easeOut' }}
-            className="toast"
+            initial={skin === 'brutal' ? { opacity: 0, y: -18, scale: 0.92 } : { opacity: 0, y: -12, scale: 0.97 }}
+            animate={{ opacity: 1, y: 0, scale: 1 }}
+            exit={{ opacity: 0, y: -10, scale: 0.96 }}
+            transition={TOAST_TRANSITION[skin]}
+            className="toast pointer-events-auto"
             data-kind={toast.kind}
           >
             <span className="dot" />
-            {toast.text}
+            <span>{toast.text}</span>
+            {toast.action && (
+              <button
+                type="button"
+                className="toast-act"
+                onClick={() => {
+                  const fn = toast.action?.onClick
+                  dismissToast()
+                  fn?.()
+                }}
+              >
+                {toast.action.label}
+              </button>
+            )}
           </motion.div>
         )}
       </AnimatePresence>

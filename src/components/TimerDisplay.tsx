@@ -1,26 +1,61 @@
-import { memo } from 'react'
+import { memo, useEffect, useRef } from 'react'
 import { HOUR } from '../domain/aggregate'
 import { formatHMS } from '../domain/format'
 import type { SkinId } from '../skin'
 
 const SEGS = 30 // 一行 30 格 = 1 小时，每格 2 分钟
 
-const cells = (s: string) =>
-  [...s].map((ch, i) => (
-    // key 带上字符：哪一位变了哪一位重新挂载，CSS 的换字动画只在那一位上播放
-    <span key={`${i}${ch}`} className={ch === ':' ? 'd-sep' : 'd'}>
-      {ch}
-    </span>
-  ))
+/**
+ * 单个数字滚轮槽：首次挂载 / 服务端渲染只输出 .d（不破坏读屏与静态标记），
+ * 客户端数字变化时同一帧挂载离场的旧数字 .d-out 与入场的新数字 .d，实现无闪烁滚轮换字。
+ */
+function DigitSlot({ ch }: { ch: string }) {
+  const committedRef = useRef<{ cur: string; prev: string | null; seq: number }>({
+    cur: ch,
+    prev: null,
+    seq: 0,
+  })
 
-/** 时分 + 弱化的秒；逐字符定宽，跳秒不位移 */
+  let { cur, prev, seq } = committedRef.current
+  if (cur !== ch) {
+    prev = cur
+    cur = ch
+    seq += 1
+  }
+
+  useEffect(() => {
+    committedRef.current = { cur, prev, seq }
+  }, [cur, prev, seq])
+
+  if (ch === ':') {
+    return <span className="d-sep">:</span>
+  }
+
+  return (
+    <span className="d-slot">
+      {prev !== null && (
+        <span key={`out-${seq}`} className="d-out" aria-hidden>
+          {prev}
+        </span>
+      )}
+      <span key={`in-${seq}-${ch}`} className="d">
+        {ch}
+      </span>
+    </span>
+  )
+}
+
+const cells = (s: string, offset = 0) =>
+  [...s].map((ch, i) => <DigitSlot key={offset + i} ch={ch} />)
+
+/** 时分 + 弱化的秒；逐字符定宽滚轮，跳秒不位移不闪烁 */
 function Digits({ ms }: { ms: number }) {
   const hms = formatHMS(ms)
   const cut = hms.length - 3
   return (
     <div className="timer-digits" role="timer">
-      {cells(hms.slice(0, cut))}
-      <span className="sec">{cells(hms.slice(cut))}</span>
+      {cells(hms.slice(0, cut), 0)}
+      <span className="sec">{cells(hms.slice(cut), cut)}</span>
     </div>
   )
 }
@@ -144,6 +179,19 @@ export function TimerDisplay({
   const shown = !exam ? ms : over ? ms - examMs : Math.ceil((examMs - ms) / 1000) * 1000
   const examMinutes = Math.round(examMs / 60000)
 
+  // 圆环扫秒节奏：每秒正常递增走 1s 线性连续扫针，跨整点套圈走瞬切防倒转，后台切回走柔顺追赶
+  const prevDialRef = useRef<{ ms: number; progress: number; active: boolean }>({ ms, progress, active })
+  const prevDial = prevDialRef.current
+  const deltaMs = ms - prevDial.ms
+  let sweep: 'linear' | 'catchup' | 'none' = 'none'
+  if (active && prevDial.active && progress >= prevDial.progress) {
+    if (running && deltaMs > 0 && deltaMs <= 1800) sweep = 'linear'
+    else if (deltaMs > 1800) sweep = 'catchup'
+  }
+  useEffect(() => {
+    prevDialRef.current = { ms, progress, active }
+  }, [ms, progress, active])
+
   if (skin === 'terminal') {
     const caption = exam
       ? active
@@ -166,10 +214,8 @@ export function TimerDisplay({
   }
 
   const { width, edge } = RING[skin]
-  // svg 整体旋转 -90°，所以 0° 在顶部
-  const theta = progress * 2 * Math.PI
-  const tipX = 100 + R * Math.cos(theta)
-  const tipY = 100 + R * Math.sin(theta)
+  // svg 整体旋转 -90°，所以 0° 在顶部；圆点指针用合成层旋转，配合线性过渡实现机械表式顺滑扫秒
+  const deg = progress * 360
   const caption = exam
     ? active
       ? `${over ? '已超时' : '已用'} ${formatHMS(over ? ms - examMs : ms)}`
@@ -178,7 +224,7 @@ export function TimerDisplay({
       ? `第 ${lap + 1} 小时`
       : '每圈 1 小时'
   return (
-    <div className="dial" data-running={running ? '' : undefined}>
+    <div className="dial" data-running={running ? '' : undefined} data-sweep={sweep}>
       <svg viewBox="0 0 200 200" aria-hidden>
         {edge ? (
           <>
@@ -238,10 +284,10 @@ export function TimerDisplay({
           </>
         ) : (
           active && (
-            <>
-              <circle className="dial-tip-halo" cx={tipX} cy={tipY} r={9} />
-              <circle className="dial-tip" cx={tipX} cy={tipY} r={4.5} />
-            </>
+            <g className="dial-hand" style={{ transform: `rotate(${deg.toFixed(3)}deg)` }}>
+              <circle className="dial-tip-halo" cx={100 + R} cy={100} r={9} />
+              <circle className="dial-tip" cx={100 + R} cy={100} r={4.5} />
+            </g>
           )
         )}
       </svg>

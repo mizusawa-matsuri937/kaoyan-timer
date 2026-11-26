@@ -10,6 +10,7 @@ import {
   pauseTimer,
   resumeTimer,
   startTimer,
+  uuid,
 } from './domain/timer'
 import type { ActiveTimer, Session, Settings, SyncConfig } from './domain/types'
 import { GitHubError, getFile, isConflict, isTransient, putFile } from './sync/github'
@@ -31,10 +32,16 @@ import {
 
 export type SyncStatus = 'disabled' | 'idle' | 'syncing' | 'ok' | 'error' | 'offline'
 
+export interface ToastAction {
+  label: string
+  onClick: () => void
+}
+
 export interface Toast {
   id: number
   text: string
   kind: 'info' | 'error' | 'success'
+  action?: ToastAction
 }
 
 export interface AppState {
@@ -122,12 +129,25 @@ export function useApp<T>(selector: (s: AppState) => T): T {
 
 // ---------- 提示 ----------
 
+export const UNDO_WINDOW_MS = 5000
+
 let toastSeq = 0
 let toastTimer: ReturnType<typeof setTimeout> | undefined
-export function showToast(text: string, kind: Toast['kind'] = 'info') {
+export function dismissToast() {
   clearTimeout(toastTimer)
-  setState({ toast: { id: ++toastSeq, text, kind } })
-  toastTimer = setTimeout(() => setState({ toast: null }), kind === 'error' ? 5000 : 2400)
+  toastTimer = undefined
+  if (state.toast) setState({ toast: null })
+}
+
+export function showToast(
+  text: string,
+  kind: Toast['kind'] = 'info',
+  opts?: { action?: ToastAction; durationMs?: number },
+) {
+  clearTimeout(toastTimer)
+  const duration = opts?.durationMs ?? (opts?.action || kind === 'error' ? UNDO_WINDOW_MS : 2400)
+  setState({ toast: { id: ++toastSeq, text, kind, action: opts?.action } })
+  toastTimer = setTimeout(() => setState({ toast: null }), duration)
 }
 
 function errorText(e: unknown): string {
@@ -329,7 +349,7 @@ function planTimer(intent: TimerIntent, cur: ActiveTimer | null, at: number): Ti
       return {
         active: { ...startTimer(intent.subjectId, at), rev },
         finished,
-        toast: finished ? ['已保存上一段，开始新科目', 'success'] : undefined,
+        toast: cur ? (finished ? ['已保存上一段，开始新科目', 'success'] : ['已切换科目', 'info']) : undefined,
       }
     }
     case 'pause':
@@ -349,6 +369,72 @@ function planTimer(intent: TimerIntent, cur: ActiveTimer | null, at: number): Ti
       return { active: null, finished, toast: finished ? ['已保存修正后的记录', 'success'] : ['已丢弃这一段', 'success'] }
     }
   }
+}
+
+interface UndoSnapshot {
+  prevActive: ActiveTimer
+  expectedActive: ActiveTimer | null
+  expectedRev: number
+  finishedId: string | null
+}
+
+/** 5 秒内撤销误触的切换科目或结束操作：墓碑化刚落库的残段，恢复原计时状态且不丢毫秒 */
+function undoTimerTransition(snap: UndoSnapshot): Promise<boolean> {
+  const at = Date.now()
+  const epoch = externalEpoch
+  return serial(async () => {
+    if (epoch !== externalEpoch) {
+      showToast('其他窗口已更新计时，无法撤销', 'info')
+      return false
+    }
+    try {
+      const result = await rwTx(async () => {
+        const current = (await getMeta('activeTimer')) ?? null
+        const rev = (await getMeta('timerRev')) ?? 0
+        if (!sameTimer(current, snap.expectedActive) || rev !== snap.expectedRev) {
+          return { stale: true as const, snapshot: await readSnapshotInTx() }
+        }
+        let tombstone: Session | null = null
+        if (snap.finishedId) {
+          const existing = await db.sessions.get(snap.finishedId)
+          if (existing && !existing.deleted) {
+            tombstone = {
+              ...existing,
+              deleted: true,
+              updatedAt: nextRevision(existing.updatedAt, at),
+            }
+            await db.sessions.put(tombstone)
+          }
+        }
+        const restored: ActiveTimer = {
+          ...snap.prevActive,
+          sessionId: uuid(),
+          rev: (snap.prevActive.rev ?? 0) + 1,
+        }
+        await setMeta('activeTimer', restored)
+        await setMeta('timerRev', rev + 1)
+        const syncMeta = tombstone ? await bumpDirtyInTx() : null
+        return { stale: false as const, restored, tombstone, syncMeta, rev: rev + 1 }
+      })
+      if (result.stale) {
+        publishSnapshot(result.snapshot)
+        showToast('计时状态已变更，无法撤销', 'info')
+        return false
+      }
+      knownTimerRev = result.rev
+      const patch: Partial<AppState> = { active: result.restored }
+      if (result.tombstone) patch.sessions = upsert(state.sessions, [result.tombstone])
+      setState(patch)
+      if (result.syncMeta) publishSyncMeta(result.syncMeta)
+      showToast('已撤销，恢复原计时', 'info')
+      notifyOtherTabs()
+      if (result.tombstone) scheduleSync()
+      return true
+    } catch (e) {
+      reportSaveError(e)
+      return false
+    }
+  })
 }
 
 /**
@@ -374,7 +460,7 @@ function timerOp(intent: TimerIntent): Promise<boolean> {
           return { stale: true as const, snapshot: await readSnapshotInTx() }
         }
         const plan = planTimer(intent, current, at)
-        if (!plan) return { stale: false as const, plan: null, syncMeta: null, rev }
+        if (!plan) return { stale: false as const, plan: null, prevActive: current, syncMeta: null, rev }
         let finished = plan.finished
         if (finished) {
           const existing = await db.sessions.get(finished.id)
@@ -387,7 +473,7 @@ function timerOp(intent: TimerIntent): Promise<boolean> {
         if (plan.active !== undefined) await setMeta('activeTimer', plan.active)
         await setMeta('timerRev', rev + 1)
         const syncMeta = finished ? await bumpDirtyInTx() : null
-        return { stale: false as const, plan: { ...plan, finished }, syncMeta, rev: rev + 1 }
+        return { stale: false as const, plan: { ...plan, finished }, prevActive: current, syncMeta, rev: rev + 1 }
       })
       if (result.stale) {
         publishSnapshot(result.snapshot)
@@ -402,7 +488,24 @@ function timerOp(intent: TimerIntent): Promise<boolean> {
       if (plan.finished) patch.sessions = upsert(state.sessions, [plan.finished])
       setState(patch)
       if (result.syncMeta) publishSyncMeta(result.syncMeta)
-      if (plan.toast) showToast(...plan.toast)
+      if (plan.toast) {
+        const undoable =
+          result.prevActive &&
+          (intent.kind === 'stop' || (intent.kind === 'select' && result.prevActive.subjectId !== intent.subjectId))
+        const undoSnap: UndoSnapshot | null = undoable
+          ? {
+              prevActive: result.prevActive!,
+              expectedActive: plan.active ?? null,
+              expectedRev: result.rev,
+              finishedId: plan.finished?.id ?? null,
+            }
+          : null
+        showToast(
+          plan.toast[0],
+          plan.toast[1],
+          undoSnap ? { action: { label: '撤销', onClick: () => void undoTimerTransition(undoSnap) } } : undefined,
+        )
+      }
       notifyOtherTabs()
       if (plan.finished) scheduleSync()
       return true

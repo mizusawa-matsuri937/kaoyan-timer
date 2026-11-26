@@ -814,17 +814,19 @@ code {
     outline: 1.5px solid var(--accent);
     outline-offset: 1px;
   }
-  /* 选中框单独一层，换选中的日子时不用重画格子 */
+  /* 选中框单独一层，换选中的日子时走合成层平移滑过去，不用重画格子 */
   .heat-ring {
     position: absolute;
-    top: calc(var(--top) + var(--step) * var(--r));
-    left: calc(var(--pad) + var(--step) * var(--c));
+    top: var(--top);
+    left: var(--pad);
     width: var(--cell);
     height: var(--cell);
     border-radius: var(--r-cell);
     outline: 2px solid var(--text);
     outline-offset: 1px;
     pointer-events: none;
+    transform: translate3d(calc(var(--step) * var(--c)), calc(var(--step) * var(--r)), 0);
+    transition: transform var(--m-slide-dur) var(--m-slide-ease);
   }
 
   /* ---------- 计时面板 ---------- */
@@ -890,15 +892,38 @@ code {
     line-height: 1;
     white-space: nowrap;
   }
-  /* 每个字符占固定宽度，换什么字体跳秒都不会抖 */
-  .timer-digits .d,
+  /* 每个字符占固定宽度，换什么字体跳秒都不会抖；滚轮槽裁切旧数字离场与新数字入场 */
+  .timer-digits .d-slot,
   .timer-digits .d-sep {
     display: inline-flex;
     justify-content: center;
     width: 0.62em;
   }
+  .timer-digits .d-slot {
+    position: relative;
+    overflow: hidden;
+    height: 1.08em;
+    align-items: center;
+    vertical-align: bottom;
+  }
+  .timer-digits .d {
+    display: inline-flex;
+    justify-content: center;
+    width: 100%;
+  }
+  .timer-digits .d-out {
+    position: absolute;
+    inset: 0;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    pointer-events: none;
+  }
   .timer-digits .d-sep {
     width: 0.34em;
+  }
+  .timer[data-state='running'] .timer-digits .d-sep {
+    animation: colon-breathe 1s ease-in-out infinite;
   }
   .timer-digits .sec {
     color: var(--muted);
@@ -974,6 +999,21 @@ code {
   .dial-arc {
     stroke: var(--c-mark);
     stroke-linecap: round;
+  }
+  .dial-hand {
+    transform-origin: 100px 100px;
+  }
+  .dial[data-sweep='linear'] .dial-arc {
+    transition: stroke-dashoffset 1.02s linear;
+  }
+  .dial[data-sweep='linear'] .dial-hand {
+    transition: transform 1.02s linear;
+  }
+  .dial[data-sweep='catchup'] .dial-arc {
+    transition: stroke-dashoffset 0.38s cubic-bezier(0.22, 1, 0.36, 1);
+  }
+  .dial[data-sweep='catchup'] .dial-hand {
+    transition: transform 0.38s cubic-bezier(0.22, 1, 0.36, 1);
   }
   .dial circle.dial-tip {
     fill: var(--c-mark);
@@ -1130,6 +1170,15 @@ code {
   .tab[aria-current='page'] {
     color: var(--accent);
   }
+  .tab-icon {
+    transition: transform 0.24s cubic-bezier(0.3, 1.5, 0.5, 1);
+  }
+  .tab:active .tab-icon {
+    transform: scale(0.9);
+  }
+  .tab[aria-current='page'] .tab-icon {
+    transform: translateY(-1.5px) scale(1.05);
+  }
   .tab-idx {
     display: none;
   }
@@ -1151,6 +1200,34 @@ code {
     border-bottom: 0;
     border-radius: var(--r-sheet) var(--r-sheet) 0 0;
     box-shadow: var(--shadow-pop);
+  }
+  /* 弹簧回弹或上拉阻尼时遮住底部缝隙，防止露出遮罩底色 */
+  .sheet::after {
+    content: '';
+    position: absolute;
+    top: 100%;
+    right: calc(-1 * var(--bw));
+    left: calc(-1 * var(--bw));
+    height: 120px;
+    background: var(--surface);
+    border-right: var(--bw) solid var(--border);
+    border-left: var(--bw) solid var(--border);
+    pointer-events: none;
+  }
+  .fold {
+    display: grid;
+    grid-template-rows: 0fr;
+    opacity: 0;
+    transition:
+      grid-template-rows 0.28s cubic-bezier(0.22, 1, 0.36, 1),
+      opacity 0.22s ease;
+  }
+  .fold[data-open] {
+    grid-template-rows: 1fr;
+    opacity: 1;
+  }
+  .fold-inner {
+    overflow: hidden;
   }
   .sheet-handle {
     width: 2.5rem;
@@ -1193,6 +1270,42 @@ code {
   }
   .toast[data-kind='info'] .dot {
     background: var(--muted);
+  }
+  .toast-act {
+    margin-left: 0.35rem;
+    padding: 0.2rem 0.55rem;
+    border-radius: var(--r-pill);
+    background: var(--accent-soft);
+    color: var(--accent);
+    font-size: 12px;
+    font-weight: 700;
+    line-height: 1.2;
+    white-space: nowrap;
+    transition: transform 0.08s;
+  }
+  .toast-act:active {
+    transform: var(--press);
+  }
+  [data-skin='terminal'] .toast-act {
+    padding: 0.1rem 0.35rem;
+    background: transparent;
+    border: 1px solid var(--accent);
+  }
+  [data-skin='terminal'] .toast-act::before {
+    content: '[';
+  }
+  [data-skin='terminal'] .toast-act::after {
+    content: ']';
+  }
+  [data-skin='brutal'] .toast-act {
+    background: var(--accent-fill);
+    color: #111111;
+    border: 1.5px solid var(--border);
+    box-shadow: 1.5px 1.5px 0 var(--border);
+    font-weight: 800;
+  }
+  [data-skin='brutal'] .toast-act:active {
+    box-shadow: none;
   }
 
   /* ---------- 皮肤选择 ---------- */
@@ -1718,12 +1831,37 @@ code {
     background: var(--bg);
     border-top-color: var(--line);
   }
+  [data-skin='paper'] .tab-ind {
+    display: block;
+    top: 6px;
+    bottom: 6px;
+  }
+  [data-skin='paper'] .tab-ind::before {
+    content: '';
+    display: block;
+    height: 100%;
+    margin: 0 0.65rem;
+    border-radius: 999px;
+    background: var(--accent-soft);
+  }
   [data-skin='paper'] .tab {
     font-weight: 500;
     color: var(--faint);
   }
   [data-skin='paper'] .tab[aria-current='page'] {
     color: var(--accent);
+  }
+  [data-skin='paper'] .subj {
+    transition:
+      background-color 0.2s ease,
+      box-shadow 0.22s ease,
+      transform 0.14s ease;
+  }
+  [data-skin='paper'] .subj:active {
+    transform: scale(0.992);
+  }
+  [data-skin='paper'] .subj[aria-pressed='true'] {
+    box-shadow: inset 3px 0 0 var(--c-ink);
   }
 
   /* ---------- 当日 24h 圆环时间轴 ---------- */
@@ -2163,6 +2301,15 @@ code {
   }
   50% {
     opacity: 0.24;
+  }
+}
+@keyframes colon-breathe {
+  0%,
+  100% {
+    opacity: 1;
+  }
+  50% {
+    opacity: 0.38;
   }
 }
 @media (prefers-reduced-motion: reduce) {

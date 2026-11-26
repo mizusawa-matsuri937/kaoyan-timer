@@ -57,3 +57,9 @@ export function getGroup(id: GroupId): Group {
 export function subjectsOf(group: GroupId): Subject[] {
   return SUBJECTS.filter((s) => s.group === group)
 }
+
+export function isMockSubject(idOrSubject: string | Subject | null | undefined): boolean {
+  if (!idOrSubject) return false
+  const sub = typeof idOrSubject === 'string' ? getSubject(idOrSubject) : idOrSubject
+  return (sub?.examMinutes ?? 0) > 0
+}

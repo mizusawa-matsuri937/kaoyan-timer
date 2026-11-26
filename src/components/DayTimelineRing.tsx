@@ -729,7 +729,7 @@ export function DayTimelineRing({
                 <span className="day-ring-cursor" />
               </div>
               <div className="mt-0.5 truncate text-[11px] text-faint">
-                {slices.length} segments · 点弧段或右侧切段
+                {summary.periodText || `${slices.length} segments`}
               </div>
             </div>
           ) : skin === 'brutal' ? (
@@ -754,7 +754,6 @@ export function DayTimelineRing({
             <div>
               <div className="flex items-baseline gap-2">
                 <span className="num text-sm font-semibold">{summary.spanText}</span>
-                <span className="text-[11px] text-muted">点击弧段查看明细</span>
               </div>
               <div className="num mt-0.5 truncate text-[11px] text-faint">
                 {summary.periodText || `共 ${slices.length} 段学习记录`}

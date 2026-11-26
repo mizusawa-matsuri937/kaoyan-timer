@@ -118,7 +118,7 @@ export function SessionEditor({ target, onClose }: { target: EditorTarget; onClo
       </div>
 
       <div className="mt-5 mb-2 flex items-center justify-between">
-        <span className="section-title">时间段（暂停会分成多段）</span>
+        <span className="section-title">时间段</span>
         <span className="num text-sm font-semibold">{formatDurationCN(total)}</span>
       </div>
       <div className="space-y-3">

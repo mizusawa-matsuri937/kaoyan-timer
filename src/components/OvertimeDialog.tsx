@@ -73,7 +73,7 @@ export function OvertimeDialog() {
         （从 {new Date(since).toLocaleString('zh-CN', { hour12: false, month: 'numeric', day: 'numeric', hour: '2-digit', minute: '2-digit' })} 开始），是不是忘记点结束了？
       </p>
       {mode === 'choose' ? (
-        <div className="grid gap-2.5">
+        <div key="choose" className="modal-swap grid gap-2.5">
           <Button
             disabled={saving}
             onClick={() => submit({ kind: 'keep' })}
@@ -99,7 +99,7 @@ export function OvertimeDialog() {
           </Button>
         </div>
       ) : (
-        <div className="grid gap-3">
+        <div key="endAt" className="modal-swap grid gap-3">
           <label className="text-sm text-muted">实际结束时间</label>
           <DateTimeField
             value={endInput}

@@ -122,7 +122,6 @@ export function SettingsPage() {
 
       <SectionTitle>外观</SectionTitle>
       <SkinPicker />
-      <p className="mt-2 px-1 text-xs text-faint">外观设置只保存在这台设备上。</p>
 
       <SectionTitle>考研</SectionTitle>
       <div className="card rows px-4">
@@ -219,21 +218,23 @@ export function SettingsPage() {
         <button className="mt-3 w-full text-left text-sm font-medium text-accent" onClick={() => setShowHelp(!showHelp)}>
           {showHelp ? '收起' : '查看'}设置步骤
         </button>
-        {showHelp && (
-          <ol className="mt-2 list-decimal space-y-1.5 pl-5 text-[13px] leading-relaxed text-muted">
-            <li>在 GitHub 新建一个 <b>Private</b> 仓库，比如 <code>kaoyan-data</code>（勾选 Add a README 即可）。</li>
-            <li>
-              打开 Settings → Developer settings → Personal access tokens → <b>Fine-grained tokens</b> → Generate new token。
-            </li>
-            <li>Repository access 选 <b>Only select repositories</b>，只选这个备份仓库。</li>
-            <li>
-              Permissions → Repository permissions → <b>Contents</b> 设为 <b>Read and write</b>，有效期建议选最长或 No
-              expiration。
-            </li>
-            <li>把生成的 Token 粘贴到上面，点「开启备份」。Token 只保存在这台设备上。</li>
-            <li>换新手机或数据丢失时：填入同样的信息点「开启备份」，会自动把 GitHub 上的记录恢复回来。</li>
-          </ol>
-        )}
+        <div className="fold" data-open={showHelp ? '' : undefined}>
+          <div className="fold-inner">
+            <ol className="mt-2 list-decimal space-y-1.5 pl-5 text-[13px] leading-relaxed text-muted">
+              <li>在 GitHub 新建一个 <b>Private</b> 仓库，比如 <code>kaoyan-data</code>（勾选 Add a README 即可）。</li>
+              <li>
+                打开 Settings → Developer settings → Personal access tokens → <b>Fine-grained tokens</b> → Generate new token。
+              </li>
+              <li>Repository access 选 <b>Only select repositories</b>，只选这个备份仓库。</li>
+              <li>
+                Permissions → Repository permissions → <b>Contents</b> 设为 <b>Read and write</b>，有效期建议选最长或 No
+                expiration。
+              </li>
+              <li>把生成的 Token 粘贴到上面，点「开启备份」。Token 只保存在这台设备上。</li>
+              <li>换新手机或数据丢失时：填入同样的信息点「开启备份」，会自动把 GitHub 上的记录恢复回来。</li>
+            </ol>
+          </div>
+        </div>
       </div>
 
       <SectionTitle>数据</SectionTitle>
@@ -241,7 +242,7 @@ export function SettingsPage() {
         <Row label="学习记录" hint={usage ? `本地占用约 ${usage}` : undefined}>
           <span className="num text-muted">{count} 条</span>
         </Row>
-        <Row label="持久化存储" hint="浏览器已承诺不自动清理本站数据">
+        <Row label="持久化存储">
           <span className="text-sm" style={{ color: persisted ? 'var(--accent)' : 'var(--muted)' }}>
             {persisted ? '已开启' : '未授予'}
           </span>
@@ -266,11 +267,8 @@ export function SettingsPage() {
           />
         </div>
       </div>
-      <p className="mt-2 px-1 text-xs leading-relaxed text-faint">
-        导入是合并而不是覆盖：已有的记录不会丢，同一条记录保留较新的版本。
-      </p>
 
-      <p className="mt-8 text-center text-xs text-faint">考研计时 v{__APP_VERSION__} · 数据仅保存在本机与你的 GitHub</p>
+      <p className="mt-8 text-center text-xs text-faint">考研计时 v{__APP_VERSION__}</p>
     </div>
   )
 }

@@ -364,3 +364,35 @@ export function heatTierProgress(ms: number): HeatTierProgress {
   }
   return { level: 4, pct: 100, nextTierLabel: '已达 10h+ 最高热度', remainMs: 0 }
 }
+
+export interface ExamPrepProgress {
+  /** 当前处于备考第几周（从 1 开始） */
+  week: number
+  /** 备考总周期已走过的连续百分比 [0, 100] */
+  pct: number
+  elapsedDays: number
+  totalDays: number
+}
+
+/** 计算从备考起始日到初试日的周期进度（第几周、已走过百分比） */
+export function examPrepProgress(startDate: string, examDate: string, today: string): ExamPrepProgress {
+  const totalSpan = diffDays(startDate, examDate)
+  if (totalSpan <= 0) {
+    return {
+      week: 1,
+      pct: today >= examDate ? 100 : 0,
+      elapsedDays: 0,
+      totalDays: 0,
+    }
+  }
+  const rawElapsed = diffDays(startDate, today)
+  const clamped = Math.max(0, Math.min(totalSpan, rawElapsed))
+  const week = Math.floor(Math.max(0, rawElapsed) / 7) + 1
+  const pct = today >= examDate ? 100 : today <= startDate ? 0 : (clamped / totalSpan) * 100
+  return {
+    week,
+    pct,
+    elapsedDays: clamped,
+    totalDays: totalSpan,
+  }
+}

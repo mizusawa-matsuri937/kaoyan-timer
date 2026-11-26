@@ -15,83 +15,89 @@
   --m-bar-w-ease: ease-out; /* 进度条数值变化 */
   --m-pick: none; /* 选中科目：标记（圆点 / 提示符） */
   --m-pick-card: none; /* 选中科目：整块 */
+  --m-digit-out: none; /* 计时旧数字离场 */
 }
 
 /* ---------- 终端极客：没有缓动，全是分步——像终端一行行重画屏幕 ---------- */
 html[data-skin='terminal'] {
   --m-enter: m-print; /* 页面里每个区块的入场 */
-  --m-enter-dur: 0.2s;
+  --m-enter-dur: 0.16s;
   --m-enter-ease: steps(4, jump-none);
-  --m-stagger: 40ms; /* 区块之间依次错开的间隔 */
+  --m-stagger: 26ms; /* 区块之间依次错开的间隔 */
   --m-title: m-type; /* 页面标题单独的入场；不定义就跟其他区块一样 */
   --m-slide-dur: 0.12s; /* 导航指示块、分段控件滑块 */
   --m-slide-ease: steps(3);
   --m-digit: m-refresh; /* 计时数字换字 */
-  --m-digit-dur: 0.14s;
+  --m-digit-out: none;
+  --m-digit-dur: 0.12s;
   --m-digit-ease: steps(2, jump-none);
   --m-bar: m-fill; /* 进度条入场 */
-  --m-bar-dur: 0.36s;
+  --m-bar-dur: 0.3s;
   --m-bar-ease: steps(9);
   --m-bar-w-ease: steps(6);
   --m-heat: m-fill; /* 热度表入场 */
-  --m-heat-dur: 0.4s;
+  --m-heat-dur: 0.34s;
   --m-heat-ease: steps(12);
   --m-pick: m-blink;
-  --m-pick-dur: 0.32s;
+  --m-pick-dur: 0.28s;
   --m-pick-ease: linear;
   --m-ctl: m-refresh; /* 开始 / 暂停 / 结束按钮换出来 */
   --m-ring: m-blink; /* 热度表选中框 */
-  --m-vt: scan; /* 换皮肤 / 明暗时的整屏过渡：none | soft | scan | push */
+  --m-vt: scan; /* 换皮肤 / 明暗时的整屏过渡：none | radial | scan | burst */
 }
 
-/* ---------- 新粗野：硬、脆、带回弹——卡片从阴影的位置弹出来 ---------- */
+/* ---------- 新粗野：硬、脆、带回弹——卡片顺着切换方向从阴影处弹出来 ---------- */
 html[data-skin='brutal'] {
-  --m-enter: m-slam;
-  --m-enter-dur: 0.3s;
-  --m-enter-ease: cubic-bezier(0.3, 1.5, 0.5, 1);
-  --m-stagger: 50ms;
+  --m-enter: m-slam-dir;
+  --m-enter-dur: 0.28s;
+  --m-enter-ease: cubic-bezier(0.26, 1.38, 0.48, 1);
+  --m-stagger: 32ms;
   --m-slide-dur: 0.28s;
-  --m-slide-ease: cubic-bezier(0.3, 1.5, 0.5, 1);
-  --m-digit: m-drop;
-  --m-digit-dur: 0.26s;
-  --m-digit-ease: cubic-bezier(0.3, 1.6, 0.5, 1);
+  --m-slide-ease: cubic-bezier(0.28, 1.42, 0.48, 1);
+  --m-digit: m-snap-in;
+  --m-digit-out: m-snap-out;
+  --m-digit-dur: 0.24s;
+  --m-digit-ease: cubic-bezier(0.28, 1.45, 0.48, 1);
   --m-bar: m-grow;
-  --m-bar-dur: 0.45s;
-  --m-bar-ease: cubic-bezier(0.3, 1.4, 0.5, 1);
+  --m-bar-dur: 0.42s;
+  --m-bar-ease: cubic-bezier(0.26, 1.35, 0.48, 1);
+  --m-bar-w-ease: cubic-bezier(0.22, 1, 0.36, 1);
   --m-heat: m-slide-x;
-  --m-heat-dur: 0.35s;
-  --m-heat-ease: cubic-bezier(0.3, 1.3, 0.5, 1);
+  --m-heat-dur: 0.32s;
+  --m-heat-ease: cubic-bezier(0.26, 1.28, 0.48, 1);
   --m-pick-card: m-punch;
-  --m-pick-dur: 0.26s;
-  --m-pick-ease: cubic-bezier(0.3, 1.8, 0.5, 1);
-  --m-ctl: m-slam;
+  --m-pick-dur: 0.24s;
+  --m-pick-ease: cubic-bezier(0.3, 1.7, 0.5, 1);
+  --m-ctl: m-slam-dir;
   --m-ring: m-ring;
-  --m-vt: push;
+  --m-vt: burst;
 }
 
-/* ---------- 纸感文艺：慢、柔——像墨迹慢慢洇开 ---------- */
+/* ---------- 纸感文艺：柔顺连贯——像温润墨迹与丝滑纸页翻动 ---------- */
 html[data-skin='paper'] {
-  --m-enter: m-rise;
+  --m-enter: m-glide-dir;
   --m-rise: 6px;
-  --m-enter-dur: 0.55s;
-  --m-enter-ease: cubic-bezier(0.2, 0.6, 0.2, 1);
-  --m-stagger: 70ms;
-  --m-slide-dur: 0.42s;
-  --m-slide-ease: cubic-bezier(0.3, 0.7, 0.2, 1);
-  --m-digit: m-fade;
-  --m-digit-dur: 0.45s;
-  --m-digit-ease: ease-out;
+  --m-enter-dur: 0.38s;
+  --m-enter-ease: cubic-bezier(0.22, 1, 0.36, 1);
+  --m-stagger: 34ms;
+  --m-slide-dur: 0.36s;
+  --m-slide-ease: cubic-bezier(0.22, 1, 0.36, 1);
+  --m-digit: m-roll-in;
+  --m-digit-out: m-roll-out;
+  --m-digit-dur: 0.32s;
+  --m-digit-ease: cubic-bezier(0.22, 1, 0.36, 1);
   --m-bar: m-grow;
-  --m-bar-dur: 0.9s;
-  --m-bar-ease: cubic-bezier(0.2, 0.6, 0.2, 1);
+  --m-bar-dur: 0.62s;
+  --m-bar-ease: cubic-bezier(0.22, 1, 0.36, 1);
+  --m-bar-w-ease: cubic-bezier(0.22, 1, 0.36, 1);
   --m-heat: m-fade;
-  --m-heat-dur: 0.6s;
-  --m-heat-ease: ease-out;
+  --m-heat-dur: 0.42s;
+  --m-heat-ease: cubic-bezier(0.22, 1, 0.36, 1);
   --m-pick: m-fade;
-  --m-pick-dur: 0.4s;
+  --m-pick-dur: 0.28s;
   --m-pick-ease: ease-out;
   --m-ctl: m-fade;
-  --m-ring: m-fade;
+  --m-ring: m-ring;
   --m-vt: soft;
 }
 
@@ -99,7 +105,8 @@ html[data-skin='paper'] {
 
 /* 区块入场。隐藏的页面是 display:none，切回来时动画会自动重播，不需要 JS。
    动的是页面里的各个区块而不是整页：弹层（.overlay）是 fixed 定位，祖先带 transform 的话会被带偏 */
-.page-in > div > :not(.overlay, .subj-groups),
+.page-in > div > :not(.overlay, .subj-groups, .subj-wrap),
+.subj-wrap > .seg,
 .subj-groups > section {
   animation: var(--m-enter) var(--m-enter-dur) var(--m-enter-ease) backwards;
   animation-delay: calc(var(--m-stagger) * var(--ord, 0));
@@ -132,18 +139,21 @@ html[data-skin='paper'] {
 .page-in > div > :nth-child(n + 10) {
   --ord: 9;
 }
-/* 计时页的科目组接在计时面板后面 */
-.subj-groups > section:nth-child(1) {
+/* 计时页的科目分栏与科目组接在计时面板后面 */
+.subj-wrap > .seg {
   --ord: 2;
 }
-.subj-groups > section:nth-child(2) {
+.subj-groups > section:nth-child(1) {
   --ord: 3;
 }
-.subj-groups > section:nth-child(3) {
+.subj-groups > section:nth-child(2) {
   --ord: 4;
 }
-.subj-groups > section:nth-child(n + 4) {
+.subj-groups > section:nth-child(3) {
   --ord: 5;
+}
+.subj-groups > section:nth-child(n + 4) {
+  --ord: 6;
 }
 
 /* 终端皮肤的页面标题：逐字打出来（宽度收到文字那么宽，揭开的进度才和字数对得上） */
@@ -156,10 +166,13 @@ html[data-skin='terminal'] .page-in > div > h1.page-title {
   animation-timing-function: steps(7);
 }
 
-/* 计时数字：变了的那一位重新挂载（见 TimerDisplay 的 key），只有它播放 */
+/* 计时数字：滚轮槽内新数字入场、旧数字同帧退场（无残影无闪烁） */
 .dial .timer-digits .d,
 .blockdigits path {
-  animation: var(--m-digit) var(--m-digit-dur) var(--m-digit-ease);
+  animation: var(--m-digit) var(--m-digit-dur) var(--m-digit-ease) both;
+}
+.dial .timer-digits .d-out {
+  animation: var(--m-digit-out) var(--m-digit-dur) var(--m-digit-ease) forwards;
 }
 /* 终端皮肤里秒每秒都在跳，不参与刷新闪烁，免得分心 */
 .blockdigits .sec {
@@ -197,10 +210,12 @@ html[data-skin='terminal'] .page-in > div > h1.page-title {
   animation: var(--m-ctl) 0.2s var(--m-enter-ease) backwards;
 }
 
-/* 结束专注归档时的正向反馈条与卡片回弹 */
-.finish-banner {
-  animation: var(--m-enter) var(--m-enter-dur) var(--m-enter-ease) backwards;
+/* 弹层内子视图切换（如超时修正面板） */
+.modal-swap {
+  animation: var(--m-enter) 0.22s var(--m-enter-ease) backwards;
 }
+
+/* 结束专注归档时的卡片微回弹 */
 html[data-skin='brutal'] .timer[data-archived] {
   animation: m-brutal-settle 0.28s cubic-bezier(0.3, 1.6, 0.5, 1);
 }
@@ -210,6 +225,12 @@ html[data-skin='brutal'] .timer[data-archived] {
   from {
     opacity: 0;
     transform: translateY(var(--m-rise));
+  }
+}
+@keyframes m-glide-dir {
+  from {
+    opacity: 0;
+    transform: translate3d(calc(var(--tab-dir, 0) * 10px), var(--m-rise), 0);
   }
 }
 @keyframes m-fade {
@@ -264,11 +285,20 @@ html[data-skin='brutal'] .timer[data-archived] {
     opacity: 1;
   }
 }
-/* 新粗野：从硬阴影所在的位置弹回原位 */
+/* 新粗野：顺着导航方向并从硬阴影所在的位置弹回原位 */
 @keyframes m-slam {
   from {
     opacity: 0;
     transform: translate(5px, 6px) scale(0.97);
+  }
+  35% {
+    opacity: 1;
+  }
+}
+@keyframes m-slam-dir {
+  from {
+    opacity: 0;
+    transform: translate3d(calc(var(--tab-dir, 0) * 12px + 4px), 5px, 0) scale(0.98);
   }
   35% {
     opacity: 1;
@@ -279,10 +309,45 @@ html[data-skin='brutal'] .timer[data-archived] {
     transform: scale(0.94);
   }
 }
-@keyframes m-drop {
+/* 物理滚轮数字：新数字从上方滚入，旧数字向下方滚出 */
+@keyframes m-roll-in {
   from {
     opacity: 0;
-    transform: translateY(-0.3em);
+    transform: translateY(-68%) scale(0.92);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+}
+@keyframes m-roll-out {
+  from {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+  to {
+    opacity: 0;
+    transform: translateY(68%) scale(0.92);
+  }
+}
+@keyframes m-snap-in {
+  from {
+    opacity: 0;
+    transform: translateY(-76%) scale(0.9);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+}
+@keyframes m-snap-out {
+  from {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+  to {
+    opacity: 0;
+    transform: translateY(76%) scale(0.9);
   }
 }
 @keyframes m-grow {
@@ -293,13 +358,14 @@ html[data-skin='brutal'] .timer[data-archived] {
 @keyframes m-slide-x {
   from {
     opacity: 0;
-    transform: translateX(18px);
+    transform: translateX(16px);
   }
 }
+/* 独立 scale 属性不覆盖 .heat-ring 的 transform 平移 */
 @keyframes m-ring {
   from {
     opacity: 0;
-    transform: scale(1.6);
+    scale: 1.5;
   }
 }
 @keyframes m-brutal-settle {
@@ -313,27 +379,32 @@ html[data-skin='brutal'] .timer[data-archived] {
 
 /* ===================== 换皮肤 / 明暗：整屏过渡 =====================
    用浏览器的 View Transitions：前后两帧是截图，过渡期间页面本身不重排。
-   skin.ts 按 --m-vt 的值写入 <html data-vt>（取换成的那套皮肤的值），不支持的浏览器直接切换。 */
+   skin.ts 按 --m-vt 写入 <html data-vt>，新粗野从点击坐标扩张，纸感保留温润慢速交叉淡化。 */
 html[data-vt]::view-transition-old(root),
 html[data-vt]::view-transition-new(root) {
   mix-blend-mode: normal;
 }
-/* 纸感：慢速交叉淡化（浏览器默认的过渡，只是放慢） */
+/* 纸感：慢速交叉淡化（保留原有柔和过渡） */
 html[data-vt='soft']::view-transition-group(root) {
   animation-duration: 0.55s;
   animation-timing-function: ease-in-out;
 }
 html[data-vt='scan']::view-transition-old(root),
-html[data-vt='push']::view-transition-old(root) {
+html[data-vt='burst']::view-transition-old(root) {
   animation: none;
+  z-index: 1;
+}
+html[data-vt='scan']::view-transition-new(root),
+html[data-vt='burst']::view-transition-new(root) {
+  z-index: 2;
 }
 /* 终端：从上到下一行行刷新 */
 html[data-vt='scan']::view-transition-new(root) {
-  animation: vt-scan 0.32s steps(12);
+  animation: vt-scan 0.28s steps(14);
 }
-/* 新粗野：新画面硬切着从右边推进来 */
-html[data-vt='push']::view-transition-new(root) {
-  animation: vt-push 0.34s cubic-bezier(0.2, 0.9, 0.3, 1);
+/* 新粗野：从点击位置清脆扩张铺满 */
+html[data-vt='burst']::view-transition-new(root) {
+  animation: vt-circle 0.36s cubic-bezier(0.16, 1, 0.3, 1);
 }
 @keyframes vt-scan {
   from {
@@ -343,8 +414,11 @@ html[data-vt='push']::view-transition-new(root) {
     clip-path: inset(0 0 0 0);
   }
 }
-@keyframes vt-push {
+@keyframes vt-circle {
   from {
-    transform: translateX(100%);
+    clip-path: circle(0px at var(--vt-x, 50%) var(--vt-y, 50%));
+  }
+  to {
+    clip-path: circle(var(--vt-r, 120vmax) at var(--vt-x, 50%) var(--vt-y, 50%));
   }
 }

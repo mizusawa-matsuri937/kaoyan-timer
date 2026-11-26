@@ -3,6 +3,7 @@ import {
   HOUR,
   buildDaily,
   dayTimelineSlices,
+  examPrepProgress,
   groupTotals,
   heatLevel,
   heatTierProgress,
@@ -389,5 +390,36 @@ describe('今日热度阶梯进度', () => {
     expect(l4.level).toBe(4)
     expect(l4.pct).toBe(100)
     expect(l4.remainMs).toBe(0)
+  })
+})
+
+describe('备考周期进度与模考科目识别', () => {
+  it('examPrepProgress 计算备考周数与连续已走过百分比', () => {
+    // 起始日当天：第 1 周，已走过 0%
+    const d0 = examPrepProgress('2026-03-01', '2026-12-26', '2026-03-01')
+    expect(d0).toEqual({ week: 1, pct: 0, elapsedDays: 0, totalDays: 300 })
+
+    // 第 7 天（满 1 周进入第 2 周）
+    const d7 = examPrepProgress('2026-03-01', '2026-12-26', '2026-03-08')
+    expect(d7.week).toBe(2)
+    expect(d7.pct).toBeCloseTo((7 / 300) * 100, 5)
+
+    // 正好走过一半（150 天）
+    const half = examPrepProgress('2026-03-01', '2026-12-26', '2026-07-29')
+    expect(half.pct).toBeCloseTo(50, 5)
+    expect(half.week).toBe(22)
+
+    // 到达或超过初试日：100%
+    expect(examPrepProgress('2026-03-01', '2026-12-26', '2026-12-26').pct).toBe(100)
+    expect(examPrepProgress('2026-03-01', '2026-12-26', '2026-12-30').pct).toBe(100)
+  })
+
+  it('isMockSubject 准确区分日常科目与全真模考', async () => {
+    const { isMockSubject } = await import('./subjects')
+    expect(isMockSubject('ds')).toBe(false)
+    expect(isMockSubject('calc')).toBe(false)
+    expect(isMockSubject('mock-408')).toBe(true)
+    expect(isMockSubject('mock-math')).toBe(true)
+    expect(isMockSubject(null)).toBe(false)
   })
 })
