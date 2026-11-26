@@ -16,6 +16,11 @@ export function formatDuration(ms: number): string {
   return `${h}h ${m}m`
 }
 
+/** 剩余时长（向上取整到分钟）：保证「已学 + 再学 = 目标整点」且不出现“再学 0m” */
+export function formatDurationCeil(ms: number): string {
+  return formatDuration(Math.ceil(Math.max(0, ms) / 60000) * 60000)
+}
+
 /** 中文时长：5小时32分 */
 export function formatDurationCN(ms: number): string {
   const totalMin = Math.max(0, Math.floor(ms / 60000))

@@ -16,7 +16,7 @@ import {
   withLive,
 } from './aggregate'
 import { addDays, diffDays, startOfWeek, weekdayMon0 } from './dates'
-import { formatDuration, formatHMS } from './format'
+import { formatDuration, formatDurationCeil, formatHMS } from './format'
 import {
   acknowledgeOvertime,
   elapsed,
@@ -358,23 +358,36 @@ describe('当日 24h 时间轴切片与圆环分区', () => {
 })
 
 describe('今日热度阶梯进度', () => {
-  it('heatTierProgress 四格填充比例、下一档文案与剩余时长同 heatLevel 严格对齐', () => {
+  it('heatTierProgress 随时间连续严格递增，无死区且剩余分钟向上取整对齐', () => {
     expect(heatTierProgress(0).level).toBe(0)
-    expect(heatTierProgress(0).fills).toEqual([0, 0, 0, 0])
-    const l1 = heatTierProgress(30 * MIN)
-    expect(l1.level).toBe(1)
-    expect(l1.fills[0]).toBeCloseTo(0.5, 5)
-    expect(l1.nextTierLabel).toBe('1–5h')
-    expect(l1.remainMs).toBe(30 * MIN)
+    expect(heatTierProgress(0).pct).toBe(0)
+
+    // 1 分钟到 10 分钟严格递增，不存在固定最小宽度死区
+    expect(heatTierProgress(5 * MIN).pct).toBeGreaterThan(heatTierProgress(1 * MIN).pct)
+    expect(heatTierProgress(10 * MIN).pct).toBeGreaterThan(heatTierProgress(5 * MIN).pct)
+
+    // 23m 30s：已学显示 23m，剩余向上取整显示 37m（23 + 37 = 60），进度约 39.17%
+    const t23 = heatTierProgress(23 * MIN + 30_000)
+    expect(t23.level).toBe(1)
+    expect(t23.pct).toBeCloseTo((23.5 / 60) * 100, 4)
+    expect(t23.nextTierLabel).toBe('1–5h')
+    expect(formatDuration(23 * MIN + 30_000)).toBe('23m')
+    expect(formatDurationCeil(t23.remainMs)).toBe('37m')
+
+    // 59m 40s：剩余不足 1 分钟时显示 1m 而非 0m
+    expect(formatDurationCeil(heatTierProgress(59 * MIN + 40_000).remainMs)).toBe('1m')
+
+    // 3h（处于 1–5h 档）：朝 5h 推进 60%，还差 2h
     const l2 = heatTierProgress(3 * HOUR)
     expect(l2.level).toBe(2)
-    expect(l2.fills[0]).toBe(1)
-    expect(l2.fills[1]).toBeCloseTo(0.5, 5)
+    expect(l2.pct).toBeCloseTo(60, 5)
     expect(l2.nextTierLabel).toBe('5–10h')
     expect(l2.remainMs).toBe(2 * HOUR)
+
+    // 10h 满格
     const l4 = heatTierProgress(10 * HOUR)
     expect(l4.level).toBe(4)
-    expect(l4.fills).toEqual([1, 1, 1, 1])
+    expect(l4.pct).toBe(100)
     expect(l4.remainMs).toBe(0)
   })
 })

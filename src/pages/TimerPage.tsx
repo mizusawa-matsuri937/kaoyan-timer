@@ -3,10 +3,10 @@ import { HEAT_VARS } from '../components/Heatmap'
 import { IconPause, IconPlay, IconStop } from '../components/icons'
 import { SubjectGrid } from '../components/SubjectGrid'
 import { TimerDisplay } from '../components/TimerDisplay'
-import { Button, Stat, tint } from '../components/ui'
+import { Button, Bar, Stat, tint } from '../components/ui'
 import { heatLevel, heatTierProgress, LEVEL_LABELS } from '../domain/aggregate'
 import { dayKey, diffDays } from '../domain/dates'
-import { formatDuration } from '../domain/format'
+import { formatDuration, formatDurationCeil } from '../domain/format'
 import { getSubject } from '../domain/subjects'
 import { elapsed } from '../domain/timer'
 import { useNow } from '../hooks/useNow'
@@ -112,17 +112,20 @@ export function TimerPage() {
           color={active ? color : THEME_GREEN}
           footer={
             <div className="stat-sub">
-              <div className="heat-steps" aria-label={`今日热度：${LEVEL_LABELS[tier.level]}`}>
-                {tier.fills.map((fill, idx) => (
-                  <span key={idx} className="heat-step-cell">
-                    <i style={{ width: `${Math.round(fill * 100)}%`, background: HEAT_VARS[idx + 1] }} />
+              <Bar pct={tier.pct} height={7} />
+              <div className="stat-meta num mt-1.5">
+                <span className="inline-flex min-w-0 items-center gap-1">
+                  <span
+                    className="heat-cell stat-heat-dot"
+                    data-low={tier.level <= 1 ? '' : undefined}
+                    style={{ background: HEAT_VARS[tier.level] }}
+                    aria-hidden
+                  />
+                  <span className="truncate">
+                    {tier.remainMs > 0 ? `差 ${formatDurationCeil(tier.remainMs)} 进 ${tier.nextTierLabel}` : tier.nextTierLabel}
                   </span>
-                ))}
-              </div>
-              <div className="stat-meta num">
-                <span>
-                  {tier.remainMs > 0 ? `再学 ${formatDuration(tier.remainMs)} 进 ${tier.nextTierLabel}` : tier.nextTierLabel}
                 </span>
+                {todayTotal > 0 && <span className="shrink-0">{Math.floor(tier.pct)}%</span>}
               </div>
             </div>
           }
