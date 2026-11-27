@@ -14,31 +14,35 @@ const base = (size = 24) => ({
 export const IconTimer = ({ size, className }: P) => (
   <svg {...base(size)} className={className}>
     <circle cx="12" cy="13" r="8" />
-    <path d="M12 9v4l2.5 2.5M9.5 2h5M12 2v3" />
+    <path className="ico-timer-top" d="M9.5 2h5M12 2v3" />
+    <path className="ico-timer-hand" d="M12 9v4l2.5 2.5" />
   </svg>
 )
 
 export const IconGrid = ({ size, className }: P) => (
   <svg {...base(size)} className={className}>
-    <rect x="3" y="3" width="5" height="5" rx="1.2" />
-    <rect x="10" y="3" width="5" height="5" rx="1.2" />
-    <rect x="17" y="3" width="4" height="5" rx="1.2" />
-    <rect x="3" y="10" width="5" height="5" rx="1.2" />
-    <rect x="10" y="10" width="5" height="5" rx="1.2" />
-    <rect x="17" y="10" width="4" height="5" rx="1.2" />
-    <rect x="3" y="17" width="5" height="4" rx="1.2" />
-    <rect x="10" y="17" width="5" height="4" rx="1.2" />
+    <rect className="ico-cell-0" x="3" y="3" width="5" height="5" rx="1.2" />
+    <rect className="ico-cell-1" x="10" y="3" width="5" height="5" rx="1.2" />
+    <rect className="ico-cell-2" x="17" y="3" width="4" height="5" rx="1.2" />
+    <rect className="ico-cell-1" x="3" y="10" width="5" height="5" rx="1.2" />
+    <rect className="ico-cell-2" x="10" y="10" width="5" height="5" rx="1.2" />
+    <rect className="ico-cell-3" x="17" y="10" width="4" height="5" rx="1.2" />
+    <rect className="ico-cell-2" x="3" y="17" width="5" height="4" rx="1.2" />
+    <rect className="ico-cell-3" x="10" y="17" width="5" height="4" rx="1.2" />
   </svg>
 )
 
 export const IconChart = ({ size, className }: P) => (
   <svg {...base(size)} className={className}>
-    <path d="M4 20V10M10 20V4M16 20v-7M22 20H2" />
+    <path className="ico-bar-1" d="M4 20V10" />
+    <path className="ico-bar-2" d="M10 20V4" />
+    <path className="ico-bar-3" d="M16 20v-7" />
+    <path d="M22 20H2" />
   </svg>
 )
 
 export const IconSettings = ({ size, className }: P) => (
-  <svg {...base(size)} className={className}>
+  <svg {...base(size)} className={`ico-gear ${className ?? ''}`.trim()}>
     <circle cx="12" cy="12" r="3" />
     <path d="M19.4 15a1.7 1.7 0 0 0 .3 1.8l.1.1a2 2 0 1 1-2.8 2.8l-.1-.1a1.7 1.7 0 0 0-1.8-.3 1.7 1.7 0 0 0-1 1.5V21a2 2 0 1 1-4 0v-.1a1.7 1.7 0 0 0-1.1-1.5 1.7 1.7 0 0 0-1.8.3l-.1.1a2 2 0 1 1-2.8-2.8l.1-.1a1.7 1.7 0 0 0 .3-1.8 1.7 1.7 0 0 0-1.5-1H3a2 2 0 1 1 0-4h.1a1.7 1.7 0 0 0 1.5-1.1 1.7 1.7 0 0 0-.3-1.8l-.1-.1a2 2 0 1 1 2.8-2.8l.1.1a1.7 1.7 0 0 0 1.8.3H9a1.7 1.7 0 0 0 1-1.5V3a2 2 0 1 1 4 0v.1a1.7 1.7 0 0 0 1 1.5 1.7 1.7 0 0 0 1.8-.3l.1-.1a2 2 0 1 1 2.8 2.8l-.1.1a1.7 1.7 0 0 0-.3 1.8V9a1.7 1.7 0 0 0 1.5 1H21a2 2 0 1 1 0 4h-.1a1.7 1.7 0 0 0-1.5 1z" />
   </svg>

@@ -1,20 +1,20 @@
 import { AnimatePresence, LayoutGroup, motion } from 'framer-motion'
-import { useEffect, useMemo, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState, type CSSProperties, type PointerEvent } from 'react'
 import { HEAT_VARS } from '../components/Heatmap'
 import { IconPause, IconPlay, IconStop } from '../components/icons'
 import { SubjectGrid, type SubjectTab } from '../components/SubjectGrid'
 import { TimerDisplay } from '../components/TimerDisplay'
 import { Button, Bar, Sheet, Stat, tint } from '../components/ui'
-import { examPrepProgress, heatLevel, heatTierProgress, LEVEL_LABELS } from '../domain/aggregate'
+import { examPrepProgress, heatLevel, heatTierProgress, LEVEL_LABELS, withLive } from '../domain/aggregate'
 import { dayKey, diffDays } from '../domain/dates'
 import { formatDuration, formatDurationCeil, formatHMS } from '../domain/format'
 import { getSubject, isMockSubject, SUBJECTS } from '../domain/subjects'
-import { elapsed } from '../domain/timer'
+import { elapsed, liveSegments } from '../domain/timer'
 import { useNow } from '../hooks/useNow'
-import { useLiveDaily } from '../hooks/useStats'
+import { useBaseDaily, useLiveDaily } from '../hooks/useStats'
 import { useWakeLock } from '../hooks/useWakeLock'
 import { THEME_GREEN } from '../lib/color'
-import { useSkin } from '../skin'
+import { useSkin, type TransitionOrigin } from '../skin'
 import { pause, resume, selectSubjectAndStart, stop, useApp } from '../store'
 
 interface ArchiveFeedback {
@@ -26,6 +26,13 @@ interface ArchiveFeedback {
   color: string
 }
 
+interface TintWave {
+  id: number
+  color: string
+  x: number
+  y: number
+}
+
 export function TimerPage() {
   const active = useApp((s) => s.active)
   const sessions = useApp((s) => s.sessions)
@@ -34,8 +41,26 @@ export function TimerPage() {
   const running = !!active && active.runningSince !== null
   const [archived, setArchived] = useState<ArchiveFeedback | null>(null)
   const [confirmSwitchId, setConfirmSwitchId] = useState<string | null>(null)
+  const [tintWave, setTintWave] = useState<TintWave | null>(null)
+  const timerRef = useRef<HTMLElement>(null)
+  const waveSeqRef = useRef(0)
+
   const now = useNow(active ? 'second' : 'minute')
-  const daily = useLiveDaily(now)
+  const ms = active ? elapsed(active, now) : 0
+  const today = dayKey(now)
+  const baseDaily = useBaseDaily()
+  const baseTodayTotal = baseDaily.get(today)?.total ?? 0
+
+  // 统计与科目列表只展示到分钟级：仅在整分跨越、状态切换或每 15 秒微调进度条时刷新 Daily，避免每秒克隆整张历史表
+  const statsSnapRef = useRef<{ key: string; ts: number }>({ key: '', ts: now })
+  const statsKey = active
+    ? `${active.sessionId}|${today}|${active.runningSince ?? 'p'}|${Math.floor((baseTodayTotal + ms) / 60000)}|${Math.floor(ms / 15000)}`
+    : `idle|${today}`
+  if (statsSnapRef.current.key !== statsKey) {
+    statsSnapRef.current = { key: statsKey, ts: now }
+  }
+  const daily = useLiveDaily(statsSnapRef.current.ts)
+
   useWakeLock(settings.keepAwake && running)
 
   // 默认选中上一次学习的科目
@@ -54,16 +79,16 @@ export function TimerPage() {
     if (active) setSubjectTab(isMockSubject(active.subjectId) ? 'mock' : 'daily')
   }, [active?.subjectId])
 
-  const today = dayKey(now)
   const todayStat = daily.get(today)
   const todayTotal = todayStat?.total ?? 0
   const countdown = diffDays(today, settings.examDate)
   const tier = useMemo(() => heatTierProgress(todayTotal), [todayTotal])
   const effectiveStart = useMemo(() => {
     let min = settings.startDate
-    for (const d of daily.keys()) if (d < min) min = d
+    for (const d of baseDaily.keys()) if (d < min) min = d
+    if (active && today < min) min = today
     return min
-  }, [daily, settings.startDate])
+  }, [baseDaily, settings.startDate, active, today])
   const prep = useMemo(
     () => examPrepProgress(effectiveStart, settings.examDate, today),
     [effectiveStart, settings.examDate, today],
@@ -71,7 +96,6 @@ export function TimerPage() {
 
   const subject = selected ? getSubject(selected) : undefined
   const color = subject?.color ?? THEME_GREEN
-  const ms = active ? elapsed(active, now) : 0
   const state = !active ? 'idle' : running ? 'running' : 'paused'
   // 模拟测试：面板改成整场考试的倒计时，到点只提醒、不自动结束
   const examMs = (subject?.examMinutes ?? 0) * 60000
@@ -87,10 +111,21 @@ export function TimerPage() {
     return () => clearTimeout(timer)
   }, [archived])
 
+  const triggerTintWave = useCallback((nextColor: string, origin?: TransitionOrigin) => {
+    const el = timerRef.current
+    if (!el || window.matchMedia?.('(prefers-reduced-motion: reduce)').matches) return
+    const rect = el.getBoundingClientRect()
+    const x = origin ? Math.max(8, Math.min(rect.width - 8, Math.round(origin.x - rect.left))) : Math.round(rect.width / 2)
+    const y = origin ? Math.max(8, Math.min(rect.height, Math.round(origin.y - rect.top))) : Math.round(rect.height)
+    setTintWave({ id: ++waveSeqRef.current, color: nextColor, x, y })
+  }, [])
+
   const handleStop = () => {
     if (active && ms >= 1000) {
-      const prevLevel = heatLevel(Math.max(0, todayTotal - ms))
-      const nextLevel = heatLevel(todayTotal)
+      const exactDaily = withLive(baseDaily, active.subjectId, liveSegments(active, Date.now()))
+      const exactTodayTotal = exactDaily.get(today)?.total ?? todayTotal
+      const prevLevel = heatLevel(Math.max(0, exactTodayTotal - ms))
+      const nextLevel = heatLevel(exactTodayTotal)
       setArchived({
         id: Date.now(),
         subjectName: subject?.short ?? subject?.name ?? '专注',
@@ -103,16 +138,20 @@ export function TimerPage() {
     void stop()
   }
 
-  const handleSubjectTab = (next: SubjectTab) => {
+  const stateRef = useRef({ active, running, selected, sessions, triggerTintWave })
+  stateRef.current = { active, running, selected, sessions, triggerTintWave }
+
+  const handleSubjectTab = useCallback((next: SubjectTab) => {
     setSubjectTab(next)
-    if (!active) {
-      const curSub = selected ? getSubject(selected) : undefined
+    const { active: curActive, selected: curSel, sessions: curSessions } = stateRef.current
+    if (!curActive) {
+      const curSub = curSel ? getSubject(curSel) : undefined
       if (next === 'mock' && (!curSub || !curSub.examMinutes)) {
         const match = SUBJECTS.find((s) => s.examMinutes && (!curSub || s.group === curSub.group))
         if (match) setPicked(match.id)
       } else if (next === 'daily' && curSub?.examMinutes) {
         let bestDaily: { id: string; t: number } | null = null
-        for (const s of sessions) {
+        for (const s of curSessions) {
           if (!s.deleted && !isMockSubject(s.subjectId) && (!bestDaily || s.startAt > bestDaily.t)) {
             bestDaily = { id: s.subjectId, t: s.startAt }
           }
@@ -121,23 +160,86 @@ export function TimerPage() {
         setPicked(bestDaily?.id ?? fallback.id)
       }
     }
-  }
+  }, [])
 
-  const onPick = (id: string) => {
-    if (active) {
-      if (active.subjectId === id) {
-        if (!running) void resume()
+  const onPick = useCallback((id: string, origin?: TransitionOrigin) => {
+    const { active: curActive, running: curRunning, selected: curSel, triggerTintWave: fireWave } = stateRef.current
+    const nextColor = getSubject(id)?.color ?? THEME_GREEN
+    if (curActive) {
+      if (curActive.subjectId === id) {
+        if (!curRunning) void resume()
         return
       }
       // 模考进行中点击其他科目弹出二次确认，防止误触打断 3 小时全真模考
-      if (isMockSubject(active.subjectId)) {
+      if (isMockSubject(curActive.subjectId)) {
         setConfirmSwitchId(id)
         return
       }
+      fireWave(nextColor, origin)
       void selectSubjectAndStart(id)
     } else {
+      if (id !== curSel) fireWave(nextColor, origin)
       setPicked(id)
     }
+  }, [])
+
+  // 指针追光视差与动态阴影：通过 rAF 直接写 CSS 变量，零 React 重渲染；触屏滑动时立刻释放，不影响原生滚动与字体锐度
+  const tiltRafRef = useRef(0)
+  const touchStartRef = useRef<{ x: number; y: number } | null>(null)
+
+  const applyTilt = (clientX: number, clientY: number, isTouch: boolean) => {
+    const el = timerRef.current
+    if (!el || window.matchMedia?.('(prefers-reduced-motion: reduce)').matches) return
+    const r = el.getBoundingClientRect()
+    if (r.width === 0 || r.height === 0) return
+    const px = Math.max(0, Math.min(1, (clientX - r.left) / r.width))
+    const py = Math.max(0, Math.min(1, (clientY - r.top) / r.height))
+    const maxDeg = skin === 'terminal' ? 0 : isTouch ? 1.3 : 2.4
+    const ry = (px - 0.5) * maxDeg * 2
+    const rx = (0.5 - py) * maxDeg * 2
+    const sx = 4 - (px - 0.5) * 4.5
+    const sy = 4 - (py - 0.5) * 4.5
+    el.dataset.hover = ''
+    el.style.setProperty('--gx', `${(px * 100).toFixed(1)}%`)
+    el.style.setProperty('--gy', `${(py * 100).toFixed(1)}%`)
+    el.style.setProperty('--rx', `${rx.toFixed(2)}deg`)
+    el.style.setProperty('--ry', `${ry.toFixed(2)}deg`)
+    el.style.setProperty('--sx', `${sx.toFixed(1)}px`)
+    el.style.setProperty('--sy', `${sy.toFixed(1)}px`)
+  }
+
+  const resetTilt = () => {
+    cancelAnimationFrame(tiltRafRef.current)
+    tiltRafRef.current = 0
+    touchStartRef.current = null
+    const el = timerRef.current
+    if (!el) return
+    delete el.dataset.hover
+    el.style.removeProperty('--rx')
+    el.style.removeProperty('--ry')
+    el.style.removeProperty('--sx')
+    el.style.removeProperty('--sy')
+  }
+
+  const onTimerPointerDown = (e: PointerEvent<HTMLElement>) => {
+    if (e.pointerType === 'mouse') return
+    if ((e.target as HTMLElement).closest('button')) return
+    touchStartRef.current = { x: e.clientX, y: e.clientY }
+    applyTilt(e.clientX, e.clientY, true)
+  }
+
+  const onTimerPointerMove = (e: PointerEvent<HTMLElement>) => {
+    if (e.pointerType !== 'mouse') {
+      const start = touchStartRef.current
+      if (start && Math.hypot(e.clientX - start.x, e.clientY - start.y) > 8) resetTilt()
+      return
+    }
+    const { clientX, clientY } = e
+    if (tiltRafRef.current) return
+    tiltRafRef.current = requestAnimationFrame(() => {
+      tiltRafRef.current = 0
+      applyTilt(clientX, clientY, false)
+    })
   }
 
   const targetSwitchSub = confirmSwitchId ? getSubject(confirmSwitchId) : undefined
@@ -194,12 +296,35 @@ export function TimerPage() {
       </header>
 
       <section
+        ref={timerRef}
         className="card timer c mt-3"
         style={tint(archived && !active ? archived.color : color)}
         data-state={state}
         data-over={over ? '' : undefined}
         data-archived={archived && !active ? '' : undefined}
+        onPointerDown={onTimerPointerDown}
+        onPointerMove={onTimerPointerMove}
+        onPointerUp={resetTilt}
+        onPointerLeave={resetTilt}
+        onPointerCancel={resetTilt}
       >
+        <div className="timer-border-beam" aria-hidden>
+          <span className="timer-border-spinner" />
+        </div>
+        <div className="timer-fx-clip" aria-hidden>
+          <span className="timer-crt-scan" />
+          <span className="timer-glare" />
+          <span className="timer-cross-x" />
+          <span className="timer-cross-y" />
+          {tintWave && (
+            <span
+              key={tintWave.id}
+              className="timer-tint-wave c"
+              style={{ ...tint(tintWave.color), '--tw-x': `${tintWave.x}px`, '--tw-y': `${tintWave.y}px` } as CSSProperties}
+              onAnimationEnd={() => setTintWave((w) => (w?.id === tintWave.id ? null : w))}
+            />
+          )}
+        </div>
         <div className="timer-head">
           <span className="prompt">
             {subject ? subject.name : '选择一个科目'}
@@ -320,7 +445,10 @@ export function TimerPage() {
                 onClick={() => {
                   const nextId = confirmSwitchId
                   setConfirmSwitchId(null)
-                  if (nextId) void selectSubjectAndStart(nextId)
+                  if (nextId) {
+                    triggerTintWave(getSubject(nextId)?.color ?? THEME_GREEN)
+                    void selectSubjectAndStart(nextId)
+                  }
                 }}
               >
                 结束考试并切换

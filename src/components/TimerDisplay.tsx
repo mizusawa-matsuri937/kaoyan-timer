@@ -1,4 +1,4 @@
-import { memo, useEffect, useRef } from 'react'
+import { memo, useEffect, useId, useRef, useState } from 'react'
 import { HOUR } from '../domain/aggregate'
 import { formatHMS } from '../domain/format'
 import type { SkinId } from '../skin'
@@ -170,6 +170,7 @@ export function TimerDisplay({
   skin: SkinId
   examMs?: number
 }) {
+  const arcMaskId = useId()
   const exam = examMs > 0
   const span = exam ? examMs : HOUR
   const lap = exam ? 0 : Math.floor(ms / HOUR)
@@ -178,9 +179,10 @@ export function TimerDisplay({
   // 倒计时向上取整到秒：刚开始显示 03:00:00，而不是立刻跳到 02:59:59
   const shown = !exam ? ms : over ? ms - examMs : Math.ceil((examMs - ms) / 1000) * 1000
   const examMinutes = Math.round(examMs / 60000)
+  const curSec = Math.floor(ms / 1000) % 60
 
   // 圆环扫秒节奏：每秒正常递增走 1s 线性连续扫针，跨整点套圈走瞬切防倒转，后台切回走柔顺追赶
-  const prevDialRef = useRef<{ ms: number; progress: number; active: boolean }>({ ms, progress, active })
+  const prevDialRef = useRef<{ ms: number; progress: number; active: boolean; lap: number }>({ ms, progress, active, lap })
   const prevDial = prevDialRef.current
   const deltaMs = ms - prevDial.ms
   let sweep: 'linear' | 'catchup' | 'none' = 'none'
@@ -188,9 +190,18 @@ export function TimerDisplay({
     if (running && deltaMs > 0 && deltaMs <= 1800) sweep = 'linear'
     else if (deltaMs > 1800) sweep = 'catchup'
   }
+
+  // 整点满圈里程碑冲击波：仅在连续专注跨过整点时触发，挂起恢复或首次挂载不误触
+  const [hourWaveKey, setHourWaveKey] = useState(0)
   useEffect(() => {
-    prevDialRef.current = { ms, progress, active }
-  }, [ms, progress, active])
+    const prev = prevDialRef.current
+    if (active && prev.active && !exam && lap > prev.lap && ms - prev.ms > 0 && ms - prev.ms <= 5000) {
+      setHourWaveKey((k) => k + 1)
+    } else if (!active && hourWaveKey !== 0) {
+      setHourWaveKey(0)
+    }
+    prevDialRef.current = { ms, progress, active, lap }
+  }, [ms, progress, active, lap, exam, hourWaveKey])
 
   if (skin === 'terminal') {
     const caption = exam
@@ -204,9 +215,14 @@ export function TimerDisplay({
       <>
         <BlockDigits ms={shown} />
         <Digits ms={shown} />
-        <SegBar on={Math.floor(progress * SEGS)} showNow={active && !over} />
+        <div className="relative">
+          <SegBar on={Math.floor(progress * SEGS)} showNow={active && !over} />
+          {hourWaveKey > 0 && <span key={hourWaveKey} className="term-hour-wave" aria-hidden />}
+        </div>
         <div className="timer-caption">
-          <span className="num">{caption}</span>
+          <span key={hourWaveKey || undefined} className={`num ${hourWaveKey > 0 ? 'hour-caption-pop' : ''}`.trim()}>
+            {caption}
+          </span>
           <span>每格 {Math.round(span / SEGS / 60000)} 分钟</span>
         </div>
       </>
@@ -214,8 +230,9 @@ export function TimerDisplay({
   }
 
   const { width, edge } = RING[skin]
-  // svg 整体旋转 -90°，所以 0° 在顶部；圆点指针用合成层旋转，配合线性过渡实现机械表式顺滑扫秒
+  // svg 整体旋转 -90°，所以 0° 在顶部；单环内完成全部微动效（唤醒原有内刻度 + 进度弧内流光 + 前锋呼吸），不设双轨
   const deg = progress * 360
+  const dashOffset = CIRC * (1 - progress)
   const caption = exam
     ? active
       ? `${over ? '已超时' : '已用'} ${formatHMS(over ? ms - examMs : ms)}`
@@ -225,22 +242,46 @@ export function TimerDisplay({
       : '每圈 1 小时'
   return (
     <div className="dial" data-running={running ? '' : undefined} data-sweep={sweep}>
+      {!edge && <span className="dial-center-aura" aria-hidden />}
+      {hourWaveKey > 0 && <span key={hourWaveKey} className="dial-hour-wave" aria-hidden />}
       <svg viewBox="0 0 200 200" aria-hidden>
+        {active && progress > 0.012 && (
+          <defs>
+            <mask id={arcMaskId}>
+              <circle
+                cx={100}
+                cy={100}
+                r={R}
+                fill="none"
+                stroke="white"
+                strokeWidth={width}
+                strokeLinecap={edge ? 'butt' : 'round'}
+                strokeDasharray={CIRC}
+                strokeDashoffset={dashOffset}
+              />
+            </mask>
+          </defs>
+        )}
         {edge ? (
           <>
             <circle className="dial-breathe-ring" cx={100} cy={100} r={R - width / 2 - 9.5} />
             <g className="dial-ticks-brutal">
-              {DIAL_60.filter((t) => t.major).map(({ i, cos, sin, quarter }) => {
-                const r1 = R - width / 2 - (quarter ? 7 : 4.5)
+              {DIAL_60.map(({ i, cos, sin, major, quarter }) => {
+                const diff = (curSec - i + 60) % 60
+                const wake = running && diff <= 3 ? diff : -1
                 const r2 = R - width / 2 - 1.5
+                const baseLen = quarter ? 5.8 : major ? 3.8 : 2.1
+                const r1 = r2 - baseLen - (wake === 0 ? 2.4 : wake === 1 ? 1.1 : 0)
                 return (
                   <line
                     key={i}
+                    data-major={major ? '' : undefined}
+                    data-wake={wake >= 0 ? String(wake) : undefined}
                     x1={100 + r1 * cos}
                     y1={100 + r1 * sin}
                     x2={100 + r2 * cos}
                     y2={100 + r2 * sin}
-                    strokeWidth={quarter ? 2.2 : 1.4}
+                    strokeWidth={wake === 0 ? 2.5 : quarter ? 2.2 : major ? 1.4 : 0.9}
                   />
                 )
               })}
@@ -248,20 +289,23 @@ export function TimerDisplay({
           </>
         ) : (
           <g className="dial-ticks-paper">
-            {DIAL_60.map(({ i, cos, sin, major, quarter }) =>
-              major ? (
+            {DIAL_60.map(({ i, cos, sin, major, quarter }) => {
+              const diff = (curSec - i + 60) % 60
+              const wake = running && diff <= 5 ? String(diff) : undefined
+              return major ? (
                 <line
                   key={i}
-                  x1={100 + (R - (quarter ? 9.5 : 7)) * cos}
-                  y1={100 + (R - (quarter ? 9.5 : 7)) * sin}
+                  data-wake={wake}
+                  x1={100 + (R - (quarter ? 9.5 : 7) - (wake === '0' ? 1.6 : 0)) * cos}
+                  y1={100 + (R - (quarter ? 9.5 : 7) - (wake === '0' ? 1.6 : 0)) * sin}
                   x2={100 + (R - 4) * cos}
                   y2={100 + (R - 4) * sin}
-                  strokeWidth={quarter ? 1.15 : 0.75}
+                  strokeWidth={wake === '0' ? 1.7 : quarter ? 1.15 : 0.75}
                 />
               ) : (
-                <circle key={i} cx={100 + (R - 5.5) * cos} cy={100 + (R - 5.5) * sin} r={0.55} />
-              ),
-            )}
+                <circle key={i} data-wake={wake} cx={100 + (R - 5.5) * cos} cy={100 + (R - 5.5) * sin} r={0.55} />
+              )
+            })}
           </g>
         )}
         <circle className="dial-track" cx={100} cy={100} r={R} strokeWidth={width} />
@@ -274,17 +318,34 @@ export function TimerDisplay({
             r={R}
             strokeWidth={width}
             strokeDasharray={CIRC}
-            strokeDashoffset={CIRC * (1 - progress)}
+            strokeDashoffset={dashOffset}
+          />
+        )}
+        {active && progress > 0.012 && (
+          <circle
+            className="dial-arc-shimmer"
+            cx={100}
+            cy={100}
+            r={R}
+            strokeWidth={width}
+            mask={`url(#${arcMaskId})`}
           />
         )}
         {edge ? (
           <>
             <circle className="dial-edge" cx={100} cy={100} r={R + width / 2} />
             <circle className="dial-edge" cx={100} cy={100} r={R - width / 2} />
+            {active && (
+              <g className="dial-hand" style={{ transform: `rotate(${deg.toFixed(3)}deg)` }}>
+                <circle className="dial-brutal-cap" cx={100 + R} cy={100} r={6} />
+                <circle className="dial-brutal-pin" cx={100 + R} cy={100} r={1.8} />
+              </g>
+            )}
           </>
         ) : (
           active && (
             <g className="dial-hand" style={{ transform: `rotate(${deg.toFixed(3)}deg)` }}>
+              <circle className="dial-tip-ripple" cx={100 + R} cy={100} r={5} />
               <circle className="dial-tip-halo" cx={100 + R} cy={100} r={9} />
               <circle className="dial-tip" cx={100 + R} cy={100} r={4.5} />
             </g>
@@ -294,7 +355,9 @@ export function TimerDisplay({
       <div className="dial-center">
         <Digits ms={shown} />
         <div className="timer-caption">
-          <span className="num">{caption}</span>
+          <span key={hourWaveKey || undefined} className={`num ${hourWaveKey > 0 ? 'hour-caption-pop' : ''}`.trim()}>
+            {caption}
+          </span>
         </div>
       </div>
     </div>

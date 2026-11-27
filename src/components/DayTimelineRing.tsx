@@ -207,13 +207,14 @@ export function DayTimelineRing({
       const arcs = svg.querySelectorAll<SVGPathElement>('[data-term-arc]')
       arcs.forEach((arc) => {
         const targetOp = arc.dataset.targetOp ?? '1'
+        const baseW = arc.getAttribute('stroke-width') ?? '10'
         const frac = Number(arc.dataset.startFrac ?? '0')
         const anim = track(
           arc.animate(
             [
-              { opacity: 0, filter: 'brightness(1.8)' },
-              { opacity: 1, filter: 'brightness(1.5)', offset: 0.35 },
-              { opacity: Number(targetOp), filter: 'brightness(1)' },
+              { opacity: 0, strokeWidth: `${Number(baseW) + 3.2}px` },
+              { opacity: 1, strokeWidth: `${Number(baseW) + 2}px`, offset: 0.35 },
+              { opacity: Number(targetOp), strokeWidth: `${baseW}px` },
             ],
             { delay: frac * 620, duration: 220, easing: 'steps(4, end)', fill: 'both' },
           ),
@@ -304,10 +305,16 @@ export function DayTimelineRing({
         const activeArc = svgRef.current.querySelector<SVGPathElement>(`[data-term-arc="${CSS.escape(selectedKey)}"]`)
         if (activeArc && typeof activeArc.animate === 'function') {
           handles.push(
-            activeArc.animate([{ filter: 'brightness(1.75)' }, { filter: 'brightness(1)' }], {
-              duration: 180,
-              easing: 'steps(3)',
-            }),
+            activeArc.animate(
+              [
+                { opacity: 0.55, strokeWidth: '15.2px' },
+                { opacity: 1, strokeWidth: '12.8px' },
+              ],
+              {
+                duration: 180,
+                easing: 'steps(3)',
+              },
+            ),
           )
         }
       }

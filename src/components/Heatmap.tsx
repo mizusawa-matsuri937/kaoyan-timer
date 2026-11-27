@@ -40,6 +40,7 @@ export const Heatmap = memo(function Heatmap({
 }: Props) {
   const skin = useSkin()
   const scrollRef = useRef<HTMLDivElement>(null)
+  const trackRef = useRef<HTMLDivElement>(null)
   const [viewW, setViewW] = useState(0)
 
   useLayoutEffect(() => {
@@ -98,15 +99,17 @@ export const Heatmap = memo(function Heatmap({
             className="heat-cell heat-day"
             aria-label={day}
             data-day={day}
+            data-r={r}
             data-l={future ? undefined : heatLevel(daily.get(day)?.total ?? 0)}
             data-today={day === today ? '' : undefined}
             disabled={future}
+            style={{ '--r': r } as CSSProperties}
           />,
         )
       }
       const label = months.get(c)
       out.push(
-        <div key={c} className="heat-col">
+        <div key={c} className="heat-col" style={{ '--col': c } as CSSProperties}>
           {label && <span className="heat-month">{label}</span>}
           {cells}
         </div>,
@@ -118,10 +121,13 @@ export const Heatmap = memo(function Heatmap({
   const todayCol = Math.floor(diffDays(gridStart, today) / 7)
 
   // 月份标签比一列宽，滚到边缘会被切掉半个字：放不下整个标签时直接隐藏。
-  // 只改 opacity、不触发布局，所以可以直接挂在 scroll 事件上
+  // 同时把当前可视区左起列号写入 --vis-c0，让入场与聚光波浪永远从屏幕可见处即时起跳
   const syncMonths = () => {
     const el = scrollRef.current
     if (!el) return
+    if (trackRef.current && step > 0) {
+      trackRef.current.style.setProperty('--vis-c0', String(Math.max(0, Math.floor(el.scrollLeft / step))))
+    }
     const lo = el.scrollLeft - 1
     const hi = el.scrollLeft + el.clientWidth + 1
     for (const label of el.querySelectorAll<HTMLElement>('.heat-month')) {
@@ -173,6 +179,9 @@ export const Heatmap = memo(function Heatmap({
     if (!anyVisible) {
       const targetCol = matchingCols[matchingCols.length - 1]
       const targetLeft = Math.max(0, targetCol - Math.floor(visible / 2)) * step
+      if (trackRef.current && step > 0) {
+        trackRef.current.style.setProperty('--vis-c0', String(Math.round(targetLeft / step)))
+      }
       const reduced = window.matchMedia?.('(prefers-reduced-motion: reduce)').matches
       el.scrollTo({ left: targetLeft, behavior: reduced || skin === 'terminal' ? 'auto' : 'smooth' })
     }
@@ -187,7 +196,52 @@ export const Heatmap = memo(function Heatmap({
 
   const onClick = (e: MouseEvent) => {
     const day = (e.target as HTMLElement).closest<HTMLElement>('[data-day]')?.dataset.day
-    if (day) onSelect(day)
+    if (!day) return
+    onSelect(day)
+
+    // 点按某天时，向周围 3 格半径内的邻格发射一圈轻量合成层波纹（零 React 重渲染）
+    const track = trackRef.current
+    if (!track || window.matchMedia?.('(prefers-reduced-motion: reduce)').matches) return
+    const idx = diffDays(gridStart, day)
+    if (idx < 0) return
+    const tc = Math.floor(idx / 7)
+    const tr = idx % 7
+    const colNodes = track.children
+    const minC = Math.max(0, tc - 3)
+    const maxC = Math.min(cols - 1, tc + 3)
+    for (let c = minC; c <= maxC; c++) {
+      const colEl = colNodes[c] as HTMLElement | undefined
+      if (!colEl) continue
+      const minR = Math.max(0, tr - 3)
+      const maxR = Math.min(6, tr + 3)
+      for (let r = minR; r <= maxR; r++) {
+        const dist = Math.hypot(c - tc, r - tr)
+        if (dist === 0 || dist > 3.1) continue
+        const nb = colEl.querySelector<HTMLButtonElement>(`.heat-day[data-r="${r}"]`)
+        if (!nb || nb.disabled || typeof nb.animate !== 'function') continue
+        if (skin === 'terminal') {
+          nb.animate([{ opacity: 1 }, { opacity: 0.42 }, { opacity: 1 }], {
+            duration: 160,
+            delay: Math.round(dist * 28),
+            easing: 'steps(2)',
+          })
+        } else {
+          const peak = skin === 'brutal' ? (dist < 1.5 ? 1.18 : 1.09) : dist < 1.5 ? 1.14 : 1.07
+          nb.animate(
+            [
+              { transform: 'scale(1)' },
+              { transform: `scale(${peak})`, offset: 0.44 },
+              { transform: 'scale(1)' },
+            ],
+            {
+              duration: skin === 'brutal' ? 300 : 350,
+              delay: Math.round(dist * 36),
+              easing: skin === 'brutal' ? 'cubic-bezier(0.28, 1.48, 0.48, 1)' : 'cubic-bezier(0.22, 1, 0.36, 1)',
+            },
+          )
+        }
+      }
+    }
   }
 
   const sel = selected && selected >= from && selected <= to ? diffDays(gridStart, selected) : -1
@@ -220,6 +274,7 @@ export const Heatmap = memo(function Heatmap({
       </div>
       <div ref={scrollRef} className="heat-scroll no-scrollbar" onScroll={onScroll}>
         <div
+          ref={trackRef}
           className="heat-track"
           data-spot={spotlightLevel != null ? String(spotlightLevel) : undefined}
           onClick={onClick}

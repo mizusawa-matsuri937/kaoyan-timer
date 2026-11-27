@@ -833,8 +833,94 @@ code {
   .timer {
     padding: 1rem 1rem 1.125rem;
     overflow: hidden;
+    transition:
+      transform 0.18s ease-out,
+      box-shadow 0.18s ease-out,
+      border-color 0.2s ease;
+  }
+  .timer[data-hover] {
+    transform: perspective(780px) rotateX(var(--rx, 0deg)) rotateY(var(--ry, 0deg));
+  }
+  .timer-fx-clip {
+    position: absolute;
+    inset: 0;
+    border-radius: inherit;
+    overflow: hidden;
+    pointer-events: none;
+    z-index: 0;
+  }
+  .timer-border-beam {
+    position: absolute;
+    inset: 0;
+    padding: 2px;
+    border-radius: calc(var(--r-card) - var(--bw));
+    overflow: hidden;
+    pointer-events: none;
+    z-index: 1;
+    opacity: 0;
+    transition: opacity 0.28s ease;
+    -webkit-mask:
+      linear-gradient(#000 0 0) content-box,
+      linear-gradient(#000 0 0);
+    -webkit-mask-composite: xor;
+    mask:
+      linear-gradient(#000 0 0) content-box,
+      linear-gradient(#000 0 0);
+    mask-composite: exclude;
+  }
+  .timer[data-state='running'] .timer-border-beam {
+    opacity: 1;
+  }
+  .timer-border-spinner {
+    position: absolute;
+    left: 50%;
+    top: 50%;
+    width: 220%;
+    aspect-ratio: 1;
+    background: conic-gradient(
+      from 0deg,
+      transparent 0deg 270deg,
+      color-mix(in srgb, var(--c-mark) 24%, transparent) 308deg,
+      var(--c-mark) 346deg,
+      var(--accent) 358deg,
+      transparent 360deg
+    );
+    transform: translate(-50%, -50%) rotate(0deg);
+  }
+  .timer[data-state='running'] .timer-border-spinner {
+    animation: timer-beam-spin 4.6s linear infinite;
+  }
+  .timer[data-over] .timer-border-spinner {
+    background: conic-gradient(from 0deg, transparent 0deg 270deg, var(--danger) 350deg, transparent 360deg);
+  }
+  .timer-crt-scan,
+  .timer-cross-x,
+  .timer-cross-y {
+    display: none;
+  }
+  .timer-glare {
+    position: absolute;
+    inset: 0;
+    opacity: 0;
+    transition: opacity 0.22s ease;
+  }
+  .timer[data-hover] .timer-glare {
+    opacity: 1;
+  }
+  .timer-tint-wave {
+    position: absolute;
+    inset: 0;
+    background: radial-gradient(
+      circle at var(--tw-x, 50%) var(--tw-y, 100%),
+      color-mix(in srgb, var(--c-mark, var(--accent)) 12%, transparent) 0%,
+      color-mix(in srgb, var(--c-mark, var(--accent)) 32%, transparent) 72%,
+      color-mix(in srgb, var(--c-mark, var(--accent)) 48%, transparent) 100%
+    );
+    animation: timer-tint-ripple 0.92s cubic-bezier(0.25, 0.85, 0.32, 1) forwards;
   }
   .timer-head {
+    position: relative;
+    z-index: 2;
     display: flex;
     align-items: center;
     justify-content: space-between;
@@ -945,6 +1031,8 @@ code {
   }
 
   .segbar {
+    position: relative;
+    z-index: 2;
     display: grid;
     grid-template-columns: repeat(30, 1fr);
     gap: 2px;
@@ -966,6 +1054,8 @@ code {
     animation: pulse 1.6s ease-in-out infinite;
   }
   .timer-caption {
+    position: relative;
+    z-index: 2;
     display: flex;
     justify-content: space-between;
     gap: 0.5rem;
@@ -976,14 +1066,18 @@ code {
 
   .dial {
     position: relative;
+    z-index: 2;
     width: min(100%, 264px);
     aspect-ratio: 1;
     margin: 1rem auto 0;
   }
   .dial svg {
+    position: relative;
+    z-index: 1;
     display: block;
     width: 100%;
     height: 100%;
+    overflow: visible;
     transform: rotate(-90deg);
   }
   .dial circle {
@@ -1026,6 +1120,7 @@ code {
   .dial-center {
     position: absolute;
     inset: 0;
+    z-index: 2;
     display: flex;
     flex-direction: column;
     align-items: center;
@@ -1040,6 +1135,8 @@ code {
   }
 
   .timer-controls {
+    position: relative;
+    z-index: 2;
     display: grid;
     gap: 0.625rem;
     margin-top: 1.25rem;
@@ -1122,6 +1219,27 @@ code {
     animation: pulse 1.6s ease-in-out infinite;
   }
 
+  /* 跨科目组平滑飞跃的共享选框（坐标由 SubjectGrid 按静态 offset 量出，只动合成层） */
+  .subj-glider {
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: var(--gw, 0px);
+    height: var(--gh, 0px);
+    transform: translate3d(var(--gx, 0px), var(--gy, 0px), 0);
+    pointer-events: none;
+    z-index: 2;
+  }
+  .subj-glider[data-glide] {
+    transition:
+      transform var(--m-slide-dur) var(--m-slide-ease),
+      width var(--m-slide-dur) var(--m-slide-ease),
+      height var(--m-slide-dur) var(--m-slide-ease),
+      background-color var(--m-slide-dur) ease,
+      border-color 0.2s ease,
+      box-shadow 0.2s ease;
+  }
+
   /* ---------- 底部导航 ---------- */
   .tabbar {
     position: fixed;
@@ -1139,7 +1257,7 @@ code {
     max-width: 32rem;
     margin: 0 auto;
   }
-  /* 当前页的底色块：按 --i 平移，切换标签时滑过去。默认不显示，用底色标记当前页的皮肤才打开 */
+  /* 当前页的底色块：按 --i 平移，切换标签时滑过去；内部 .tab-ind-pill 负责跨距果冻拉伸 */
   .tab-ind {
     display: none;
     position: absolute;
@@ -1150,6 +1268,12 @@ code {
     pointer-events: none;
     transform: translateX(calc(var(--i) * 100%));
     transition: transform var(--m-slide-dur) var(--m-slide-ease);
+  }
+  .tab-ind-pill {
+    display: block;
+    width: 100%;
+    height: 100%;
+    transform-origin: center;
   }
   .tab {
     position: relative;
@@ -1414,9 +1538,63 @@ code {
     overflow: visible;
     padding-top: 1.75rem;
   }
+  [data-skin='terminal'] .timer[data-hover] {
+    transform: none;
+  }
   [data-skin='terminal'] .timer-head {
+    z-index: 3;
     right: 0.55rem;
     max-width: none;
+  }
+  [data-skin='terminal'] .timer-border-beam {
+    inset: -1px;
+    padding: 1.5px;
+    border-radius: 0;
+  }
+  [data-skin='terminal'] .timer-border-spinner {
+    background: conic-gradient(from 0deg, transparent 0deg 282deg, var(--c-ink) 336deg, var(--accent) 356deg, transparent 360deg);
+  }
+  [data-skin='terminal'] .timer[data-state='running'] .timer-border-spinner {
+    animation-duration: 3.8s;
+  }
+  [data-skin='terminal'] .timer-crt-scan {
+    display: block;
+    position: absolute;
+    inset: 0 0 auto;
+    height: 36px;
+    background: linear-gradient(180deg, transparent, var(--c-soft), transparent);
+    opacity: 0;
+  }
+  [data-skin='terminal'] .timer[data-state='running'] .timer-crt-scan {
+    animation: timer-crt-scan 4.2s linear infinite;
+  }
+  [data-skin='terminal'] .timer-cross-x,
+  [data-skin='terminal'] .timer-cross-y {
+    display: block;
+    position: absolute;
+    background: var(--c-ink);
+    opacity: 0;
+    transition: opacity 0.14s steps(2);
+  }
+  [data-skin='terminal'] .timer-cross-x {
+    left: 0;
+    right: 0;
+    top: var(--gy, 50%);
+    height: 1px;
+  }
+  [data-skin='terminal'] .timer-cross-y {
+    top: 0;
+    bottom: 0;
+    left: var(--gx, 50%);
+    width: 1px;
+  }
+  [data-skin='terminal'] .timer[data-hover] .timer-cross-x,
+  [data-skin='terminal'] .timer[data-hover] .timer-cross-y {
+    opacity: 0.16;
+  }
+  [data-skin='terminal'] .timer-tint-wave {
+    animation-duration: 0.68s;
+    animation-timing-function: steps(11);
   }
   [data-skin='terminal'] .timer[data-state='running'] {
     border-color: var(--c-ink);
@@ -1426,6 +1604,8 @@ code {
   }
   /* 方块大字：时分用正文色，秒用科目色；文字版留给读屏，视觉上收起来 */
   [data-skin='terminal'] .blockdigits {
+    position: relative;
+    z-index: 2;
     display: block;
     width: 100%;
     max-width: 21rem;
@@ -1532,8 +1712,15 @@ code {
   [data-skin='terminal'] .subj[aria-pressed='true'] {
     box-shadow: inset 2px 0 0 var(--c-ink);
   }
+  [data-skin='terminal'] .subj-groups[data-glider-ready] .subj[aria-pressed='true'] {
+    box-shadow: none;
+  }
   [data-skin='terminal'] .subj[aria-pressed='true'] .subj-time {
     color: var(--text);
+  }
+  [data-skin='terminal'] .subj-glider {
+    border: 1px solid color-mix(in srgb, var(--c-ink) 52%, transparent);
+    box-shadow: inset 2px 0 0 var(--c-ink);
   }
   /* 选中的科目：圆点换成提示符 */
   [data-skin='terminal'] .subj[aria-pressed='true'] .subj-mark .dot {
@@ -1561,6 +1748,8 @@ code {
   }
   [data-skin='terminal'] .tab-ind {
     display: block;
+  }
+  [data-skin='terminal'] .tab-ind-pill {
     background: var(--accent);
   }
   [data-skin='terminal'] .tab[aria-current='page'] {
@@ -1677,6 +1866,55 @@ code {
     border-radius: var(--r-pill);
     font-weight: 800;
   }
+  [data-skin='brutal'] .timer[data-state='running'] {
+    box-shadow: 2.5px 2.5px 0 var(--border);
+  }
+  [data-skin='brutal'] .timer-border-beam {
+    padding: 2.5px;
+  }
+  [data-skin='brutal'] .timer-border-spinner {
+    background: conic-gradient(
+      from 0deg,
+      transparent 0deg 272deg,
+      color-mix(in srgb, var(--c-mark) 32%, transparent) 306deg,
+      var(--c-mark) 344deg,
+      var(--accent-fill) 357deg,
+      transparent 360deg
+    );
+  }
+  [data-mode='dark'][data-skin='brutal'] .timer-border-spinner,
+  [data-mode='dark'] [data-skin='brutal'] .timer-border-spinner {
+    background: conic-gradient(
+      from 0deg,
+      transparent 0deg 272deg,
+      color-mix(in srgb, var(--c-fill) 28%, transparent) 306deg,
+      var(--c-fill) 342deg,
+      var(--accent-fill) 357deg,
+      transparent 360deg
+    );
+  }
+  [data-skin='brutal'] .timer[data-state='running'] .timer-border-spinner {
+    animation-duration: 4.2s;
+  }
+  [data-skin='brutal'] .timer[data-hover] {
+    box-shadow: var(--sx, 4px) var(--sy, 4px) 0 var(--border);
+  }
+  [data-skin='brutal'] .timer-tint-wave {
+    background: radial-gradient(
+      circle at var(--tw-x, 50%) var(--tw-y, 100%),
+      color-mix(in srgb, var(--c-fill) 18%, transparent) 0%,
+      color-mix(in srgb, var(--c-fill) 48%, transparent) 76%,
+      color-mix(in srgb, var(--c-fill) 72%, transparent) 100%
+    );
+    animation-duration: 0.88s;
+  }
+  [data-skin='brutal'] .timer-glare {
+    background: radial-gradient(
+      170px circle at var(--gx, 50%) var(--gy, 50%),
+      color-mix(in srgb, var(--c-fill) 32%, transparent),
+      transparent 68%
+    );
+  }
   [data-skin='brutal'] .timer[data-state='running'] .status {
     color: var(--text);
     font-weight: 700;
@@ -1745,6 +1983,24 @@ code {
   [data-skin='brutal'] .subj-name {
     font-weight: 700;
   }
+  /* 新粗野选框就是那块实心彩色卡片本身：切换时整块色卡带硬阴影弹跳过去，无额外黄边 */
+  [data-skin='brutal'] .subj-glider {
+    z-index: 0;
+    border-radius: var(--r-ctl);
+    background: var(--c-fill);
+    border: 2px solid var(--border);
+    box-shadow: var(--shadow-ctl);
+  }
+  [data-skin='brutal'] .subj-glider[data-glide] {
+    z-index: 1;
+  }
+  [data-skin='brutal'] .subj-groups[data-glider-ready] .subj[aria-pressed='true'] {
+    position: relative;
+    z-index: 2;
+    background: transparent;
+    border-color: transparent;
+    box-shadow: none;
+  }
   /* 悬浮描边导航 */
   [data-skin='brutal'] .tabbar {
     right: 1rem;
@@ -1767,6 +2023,8 @@ code {
   }
   [data-skin='brutal'] .tab-ind {
     display: block;
+  }
+  [data-skin='brutal'] .tab-ind-pill {
     background: var(--accent-fill);
   }
   [data-skin='brutal'] .tab[aria-current='page'] {
@@ -1836,13 +2094,59 @@ code {
     top: 6px;
     bottom: 6px;
   }
-  [data-skin='paper'] .tab-ind::before {
-    content: '';
-    display: block;
-    height: 100%;
+  [data-skin='paper'] .tab-ind-pill {
+    width: auto;
     margin: 0 0.65rem;
     border-radius: 999px;
     background: var(--accent-soft);
+  }
+  [data-skin='paper'] .timer-border-beam {
+    padding: 1.75px;
+  }
+  [data-skin='paper'] .timer-border-spinner {
+    background: conic-gradient(
+      from 0deg,
+      transparent 0deg 264deg,
+      color-mix(in srgb, var(--c-mark) 18%, transparent) 304deg,
+      var(--c-mark) 346deg,
+      var(--accent) 358deg,
+      transparent 360deg
+    );
+  }
+  [data-mode='dark'][data-skin='paper'] .timer-border-spinner,
+  [data-mode='dark'] [data-skin='paper'] .timer-border-spinner {
+    background: conic-gradient(
+      from 0deg,
+      transparent 0deg 264deg,
+      color-mix(in srgb, var(--c-mark) 20%, transparent) 304deg,
+      var(--c-mark) 344deg,
+      #f8efe2 358deg,
+      transparent 360deg
+    );
+  }
+  [data-skin='paper'] .timer[data-state='running'] .timer-border-spinner {
+    animation-duration: 5.2s;
+  }
+  [data-skin] .timer[data-over] .timer-border-spinner {
+    background: conic-gradient(from 0deg, transparent 0deg 270deg, var(--danger) 352deg, transparent 360deg);
+  }
+  [data-skin='paper'] .timer-tint-wave {
+    animation-duration: 1.05s;
+  }
+  [data-skin='paper'] .timer-glare {
+    background: radial-gradient(
+      220px circle at var(--gx, 50%) var(--gy, 50%),
+      color-mix(in srgb, var(--c-mark) 13%, rgba(255, 248, 236, 0.22)),
+      transparent 72%
+    );
+  }
+  [data-mode='dark'][data-skin='paper'] .timer-glare,
+  [data-mode='dark'] [data-skin='paper'] .timer-glare {
+    background: radial-gradient(
+      220px circle at var(--gx, 50%) var(--gy, 50%),
+      color-mix(in srgb, var(--c-mark) 16%, transparent),
+      transparent 72%
+    );
   }
   [data-skin='paper'] .tab {
     font-weight: 500;
@@ -1862,6 +2166,14 @@ code {
   }
   [data-skin='paper'] .subj[aria-pressed='true'] {
     box-shadow: inset 3px 0 0 var(--c-ink);
+  }
+  [data-skin='paper'] .subj-groups[data-glider-ready] .subj[aria-pressed='true'] {
+    box-shadow: none;
+  }
+  [data-skin='paper'] .subj-glider {
+    border-radius: 6px;
+    box-shadow: inset 3px 0 0 var(--c-ink);
+    background: color-mix(in srgb, var(--c) 5%, transparent);
   }
 
   /* ---------- 当日 24h 圆环时间轴 ---------- */
@@ -2052,11 +2364,49 @@ code {
     background: #111111;
   }
 
-  /* ---------- 圆圈表盘精细刻度、运行呼吸与结束归档反馈 ---------- */
+  /* ---------- 单环圆盘：原有 60 内刻度随秒唤醒、弧内流光与前锋微澜（零外圈双轨） ---------- */
   .dial-ticks-brutal line {
     stroke: var(--border);
     stroke-linecap: square;
+    opacity: 0.22;
+    transition:
+      opacity 0.16s ease-out,
+      stroke 0.16s ease-out;
   }
+  [data-mode='dark'][data-skin='brutal'] .dial-ticks-brutal line,
+  [data-mode='dark'] [data-skin='brutal'] .dial-ticks-brutal line {
+    stroke: var(--muted);
+  }
+  .dial-ticks-brutal line[data-major] {
+    opacity: 0.72;
+  }
+  .dial-ticks-brutal line[data-wake='0'] {
+    stroke: var(--c-mark);
+    opacity: 1;
+  }
+  [data-mode='dark'][data-skin='brutal'] .dial-ticks-brutal line[data-wake='0'],
+  [data-mode='dark'] [data-skin='brutal'] .dial-ticks-brutal line[data-wake='0'] {
+    stroke: var(--accent-fill);
+  }
+  .dial-ticks-brutal line[data-wake='1'] {
+    stroke: var(--c-mark);
+    opacity: 0.85;
+  }
+  .dial-ticks-brutal line[data-wake='2'] {
+    stroke: var(--c-mark);
+    opacity: 0.58;
+  }
+  .dial-ticks-brutal line[data-wake='3'] {
+    stroke: var(--c-mark);
+    opacity: 0.36;
+  }
+  [data-mode='dark'][data-skin='brutal'] .dial-ticks-brutal line[data-wake='1'],
+  [data-mode='dark'] [data-skin='brutal'] .dial-ticks-brutal line[data-wake='1'],
+  [data-mode='dark'][data-skin='brutal'] .dial-ticks-brutal line[data-wake='2'],
+  [data-mode='dark'] [data-skin='brutal'] .dial-ticks-brutal line[data-wake='2'] {
+    stroke: var(--c-fill);
+  }
+
   .dial circle.dial-breathe-ring {
     stroke: var(--c-fill);
     stroke-width: 2px;
@@ -2065,13 +2415,155 @@ code {
   .dial[data-running] circle.dial-breathe-ring {
     animation: brutal-ring-breathe 2.8s ease-in-out infinite;
   }
+  .dial circle.dial-brutal-cap {
+    fill: var(--accent-fill);
+    stroke: var(--border);
+    stroke-width: 2px;
+  }
+  .dial circle.dial-brutal-pin {
+    fill: #111111;
+  }
+
+  /* 严格锁在已完成进度弧内部的流光脉冲（借鉴 Magic UI / Motion Primitives Shimmer） */
+  .dial circle.dial-arc-shimmer {
+    stroke: #ffffff;
+    stroke-dasharray: 56 520;
+    stroke-dashoffset: 576;
+    opacity: 0;
+    pointer-events: none;
+  }
+  [data-skin='brutal'] .dial circle.dial-arc-shimmer {
+    stroke: var(--accent-fill);
+  }
+  .dial[data-running] circle.dial-arc-shimmer {
+    opacity: 0.52;
+    animation: dial-arc-flow 2.8s linear infinite;
+  }
+  [data-skin='paper'] .dial[data-running] circle.dial-arc-shimmer {
+    opacity: 0.45;
+    animation-duration: 3.4s;
+  }
+
+  /* 纸感中心柔晕严格限制在内刻度圈以内（width 56%），绝不外溢形成双轨 */
+  .dial-center-aura {
+    position: absolute;
+    left: 50%;
+    top: 50%;
+    width: 56%;
+    height: 56%;
+    border-radius: 50%;
+    background: radial-gradient(circle, color-mix(in srgb, var(--c-mark) 16%, transparent) 0%, transparent 72%);
+    transform: translate(-50%, -50%) scale(0.9);
+    opacity: 0;
+    pointer-events: none;
+    z-index: 0;
+  }
+  .dial[data-running] .dial-center-aura {
+    animation: center-aura-breathe 4.8s ease-in-out infinite;
+  }
+
+  .dial-hour-wave {
+    position: absolute;
+    inset: 6%;
+    border-radius: 50%;
+    pointer-events: none;
+    z-index: 3;
+  }
+  .dial-hour-wave::before,
+  .dial-hour-wave::after {
+    content: '';
+    position: absolute;
+    inset: 0;
+    border-radius: 50%;
+    border: 2px solid var(--c-mark);
+    opacity: 0;
+  }
+  [data-skin='brutal'] .dial-hour-wave::before {
+    border-color: var(--border);
+    box-shadow: 0 0 0 2px var(--c-fill);
+  }
+  .dial-hour-wave::before {
+    animation: dial-shockwave 0.72s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+  }
+  .dial-hour-wave::after {
+    animation: dial-shockwave 0.82s 0.11s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+  }
+  .term-hour-wave {
+    position: absolute;
+    inset: -3px -4px;
+    border: 1.5px solid var(--c-ink);
+    pointer-events: none;
+    z-index: 3;
+    animation: term-shockwave 0.42s steps(5) forwards;
+  }
+  .hour-caption-pop {
+    display: inline-block;
+    animation: hour-badge-pop 0.38s cubic-bezier(0.28, 1.5, 0.48, 1);
+  }
+
   .dial-ticks-paper line {
     stroke: var(--muted);
     opacity: 0.4;
+    transition:
+      opacity 0.65s ease,
+      stroke 0.55s ease;
   }
   .dial-ticks-paper circle {
     fill: var(--faint);
-    opacity: 0.52;
+    opacity: 0.48;
+    transform-box: fill-box;
+    transform-origin: center;
+    transition:
+      opacity 0.75s ease,
+      transform 0.6s cubic-bezier(0.22, 1, 0.36, 1),
+      fill 0.55s ease;
+  }
+  .dial-ticks-paper line[data-wake='0'] {
+    stroke: var(--c-mark);
+    opacity: 1;
+  }
+  .dial-ticks-paper line[data-wake='1'],
+  .dial-ticks-paper line[data-wake='2'] {
+    stroke: var(--c-mark);
+    opacity: 0.72;
+  }
+  .dial-ticks-paper line[data-wake='3'],
+  .dial-ticks-paper line[data-wake='4'],
+  .dial-ticks-paper line[data-wake='5'] {
+    stroke: var(--c-mark);
+    opacity: 0.48;
+  }
+  .dial-ticks-paper circle[data-wake='0'] {
+    fill: var(--c-mark);
+    opacity: 1;
+    transform: scale(2.15);
+  }
+  .dial-ticks-paper circle[data-wake='1'] {
+    fill: var(--c-mark);
+    opacity: 0.84;
+    transform: scale(1.7);
+  }
+  .dial-ticks-paper circle[data-wake='2'] {
+    fill: var(--c-mark);
+    opacity: 0.66;
+    transform: scale(1.38);
+  }
+  .dial-ticks-paper circle[data-wake='3'],
+  .dial-ticks-paper circle[data-wake='4'],
+  .dial-ticks-paper circle[data-wake='5'] {
+    fill: var(--c-mark);
+    opacity: 0.46;
+    transform: scale(1.15);
+  }
+  .dial circle.dial-tip-ripple {
+    stroke: var(--c-mark);
+    stroke-width: 1.25px;
+    opacity: 0;
+    transform-box: fill-box;
+    transform-origin: center;
+  }
+  .dial[data-running] circle.dial-tip-ripple {
+    animation: tip-local-ripple 2.4s cubic-bezier(0.16, 1, 0.3, 1) infinite;
   }
   .dial circle.dial-tip-halo {
     fill: var(--c-mark);
@@ -2142,7 +2634,6 @@ code {
     transition:
       transform 0.2s cubic-bezier(0.22, 1, 0.36, 1),
       opacity 0.22s ease,
-      box-shadow 0.22s ease,
       outline-color 0.18s ease;
   }
   [data-skin='terminal'] .heat-day {
@@ -2310,6 +2801,103 @@ code {
   }
   50% {
     opacity: 0.38;
+  }
+}
+@keyframes timer-beam-spin {
+  to {
+    transform: translate(-50%, -50%) rotate(360deg);
+  }
+}
+@keyframes timer-crt-scan {
+  0% {
+    transform: translateY(-100%);
+    opacity: 0;
+  }
+  12% {
+    opacity: 0.85;
+  }
+  85% {
+    opacity: 0.85;
+  }
+  100% {
+    transform: translateY(340px);
+    opacity: 0;
+  }
+}
+@keyframes timer-tint-ripple {
+  0% {
+    clip-path: circle(0% at var(--tw-x, 50%) var(--tw-y, 100%));
+    opacity: 0.92;
+  }
+  52% {
+    opacity: 0.72;
+  }
+  100% {
+    clip-path: circle(145% at var(--tw-x, 50%) var(--tw-y, 100%));
+    opacity: 0;
+  }
+}
+@keyframes dial-arc-flow {
+  from {
+    stroke-dashoffset: 576;
+  }
+  to {
+    stroke-dashoffset: 0;
+  }
+}
+@keyframes tip-local-ripple {
+  0% {
+    opacity: 0.78;
+    transform: scale(0.8);
+  }
+  100% {
+    opacity: 0;
+    transform: scale(2.4);
+  }
+}
+@keyframes center-aura-breathe {
+  0%,
+  100% {
+    opacity: 0.42;
+    transform: translate(-50%, -50%) scale(0.88);
+  }
+  50% {
+    opacity: 0.85;
+    transform: translate(-50%, -50%) scale(1.06);
+  }
+}
+@keyframes dial-shockwave {
+  0% {
+    opacity: 0.85;
+    transform: scale(0.88);
+  }
+  100% {
+    opacity: 0;
+    transform: scale(1.34);
+  }
+}
+@keyframes term-shockwave {
+  0% {
+    opacity: 0.95;
+    transform: scale(0.98, 0.9);
+  }
+  100% {
+    opacity: 0;
+    transform: scale(1.04, 1.85);
+  }
+}
+@keyframes hour-badge-pop {
+  0% {
+    opacity: 0;
+    transform: translateY(-6px) scale(0.88);
+  }
+  60% {
+    opacity: 1;
+    transform: translateY(1px) scale(1.06);
+  }
+  100% {
+    opacity: 1;
+    transform: translateY(0) scale(1);
   }
 }
 @media (prefers-reduced-motion: reduce) {

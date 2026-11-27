@@ -1,5 +1,5 @@
 import { AnimatePresence, motion, useDragControls, type Transition } from 'framer-motion'
-import { useEffect, type CSSProperties, type InputHTMLAttributes, type MouseEvent, type ReactNode } from 'react'
+import { memo, useEffect, type CSSProperties, type InputHTMLAttributes, type MouseEvent, type ReactNode } from 'react'
 import { useSkin, type SkinId, type TransitionOrigin } from '../skin'
 import { dismissToast, useApp } from '../store'
 
@@ -233,11 +233,12 @@ export function Stat({
 }
 
 /** 进度条；不传 color 时用主题强调色 */
-export function Bar({ pct, color, height }: { pct: number; color?: string; height?: number }) {
+export const Bar = memo(function Bar({ pct, color, height }: { pct: number; color?: string; height?: number }) {
+  const clamped = Math.round(Math.max(0, Math.min(100, pct)) * 100) / 100
   const style = { ...(color ? tint(color) : null), ...(height ? { '--bar-h': `${height}px` } : null) } as CSSProperties
   return (
     <div className={`bar ${color ? 'c' : ''}`} style={style}>
-      <i style={{ width: `${Math.max(0, Math.min(100, pct))}%` }} />
+      <i style={{ width: `${clamped}%` }} />
     </div>
   )
-}
+})

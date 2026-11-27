@@ -38,6 +38,10 @@ html[data-skin='terminal'] {
   --m-heat: m-fill; /* 热度表入场 */
   --m-heat-dur: 0.34s;
   --m-heat-ease: steps(12);
+  --m-heat-cell: m-refresh;
+  --m-heat-cell-dur: 0.18s;
+  --m-heat-cell-ease: steps(3, jump-none);
+  --m-heat-step: 13ms;
   --m-pick: m-blink;
   --m-pick-dur: 0.28s;
   --m-pick-ease: linear;
@@ -62,9 +66,13 @@ html[data-skin='brutal'] {
   --m-bar-dur: 0.42s;
   --m-bar-ease: cubic-bezier(0.26, 1.35, 0.48, 1);
   --m-bar-w-ease: cubic-bezier(0.22, 1, 0.36, 1);
-  --m-heat: m-slide-x;
-  --m-heat-dur: 0.32s;
-  --m-heat-ease: cubic-bezier(0.26, 1.28, 0.48, 1);
+  --m-heat: m-fade;
+  --m-heat-dur: 0.24s;
+  --m-heat-ease: ease-out;
+  --m-heat-cell: m-keycap-wave;
+  --m-heat-cell-dur: 0.32s;
+  --m-heat-cell-ease: cubic-bezier(0.28, 1.48, 0.48, 1);
+  --m-heat-step: 15ms;
   --m-pick-card: m-punch;
   --m-pick-dur: 0.24s;
   --m-pick-ease: cubic-bezier(0.3, 1.7, 0.5, 1);
@@ -91,8 +99,12 @@ html[data-skin='paper'] {
   --m-bar-ease: cubic-bezier(0.22, 1, 0.36, 1);
   --m-bar-w-ease: cubic-bezier(0.22, 1, 0.36, 1);
   --m-heat: m-fade;
-  --m-heat-dur: 0.42s;
+  --m-heat-dur: 0.28s;
   --m-heat-ease: cubic-bezier(0.22, 1, 0.36, 1);
+  --m-heat-cell: m-ink-cell;
+  --m-heat-cell-dur: 0.42s;
+  --m-heat-cell-ease: cubic-bezier(0.22, 1, 0.36, 1);
+  --m-heat-step: 17ms;
   --m-pick: m-fade;
   --m-pick-dur: 0.28s;
   --m-pick-ease: ease-out;
@@ -155,6 +167,10 @@ html[data-skin='paper'] {
 .subj-groups > section:nth-child(n + 4) {
   --ord: 6;
 }
+.subj-groups > .subj-glider {
+  animation: m-fade var(--m-enter-dur) var(--m-enter-ease) backwards;
+  animation-delay: calc(var(--m-stagger) * 4);
+}
 
 /* 终端皮肤的页面标题：逐字打出来（宽度收到文字那么宽，揭开的进度才和字数对得上） */
 .page-in > div > h1.page-title {
@@ -187,13 +203,73 @@ html[data-skin='terminal'] .page-in > div > h1.page-title {
   animation-delay: calc(var(--m-stagger) * var(--ord, 0) + 80ms);
 }
 
-/* 热度表：动的是滚动容器这一个节点，不是几百个格子 */
+/* 热度表：利用当前可视区左起列 --vis-c0 算对角线序号，只让屏幕可见列排开斜向多米诺波浪，播完不留合成层 */
 .heat-scroll {
   animation: var(--m-heat) var(--m-heat-dur) var(--m-heat-ease) backwards;
-  animation-delay: calc(var(--m-stagger) * 2);
+  animation-delay: calc(var(--m-stagger) * 1.5);
+}
+.heat-scroll .heat-day:not(:disabled) {
+  animation: var(--m-heat-cell) var(--m-heat-cell-dur) var(--m-heat-cell-ease) backwards;
+  animation-delay: calc(
+    var(--m-stagger) * 1.5 + clamp(0ms, calc((var(--col, 0) - var(--vis-c0, 0) + var(--r, 0)) * var(--m-heat-step, 15ms)), 360ms)
+  );
+}
+/* 切换等级聚光灯时，匹配格从可视区左起依次浮出波纹（用独立 scale 属性不覆盖基础 transform） */
+html:not([data-skin='terminal']) .heat-track[data-spot='0'] .heat-day[data-l='0']:not(:disabled),
+html:not([data-skin='terminal']) .heat-track[data-spot='1'] .heat-day[data-l='1']:not(:disabled),
+html:not([data-skin='terminal']) .heat-track[data-spot='2'] .heat-day[data-l='2']:not(:disabled),
+html:not([data-skin='terminal']) .heat-track[data-spot='3'] .heat-day[data-l='3']:not(:disabled),
+html:not([data-skin='terminal']) .heat-track[data-spot='4'] .heat-day[data-l='4']:not(:disabled) {
+  animation: m-spot-wave 0.34s clamp(0ms, calc((var(--col, 0) - var(--vis-c0, 0)) * 16ms), 260ms) cubic-bezier(0.28, 1.5, 0.48, 1)
+    backwards;
 }
 .heat-ring {
   animation: var(--m-ring) 0.24s ease-out;
+}
+
+/* 底部导航当前页图标微编舞（精准 view-box 原点，兼容 iOS Safari / Android Chrome） */
+html:not([data-skin='terminal']) .tab[aria-current='page'] .ico-timer-top {
+  animation: m-ico-crown 0.34s cubic-bezier(0.28, 1.5, 0.48, 1);
+}
+html:not([data-skin='terminal']) .tab[aria-current='page'] .ico-timer-hand {
+  transform-box: view-box;
+  transform-origin: 12px 13px;
+  animation: m-ico-spin 0.46s cubic-bezier(0.22, 1, 0.36, 1);
+}
+html:not([data-skin='terminal']) .tab[aria-current='page'] .ico-cell-0,
+html:not([data-skin='terminal']) .tab[aria-current='page'] .ico-cell-1,
+html:not([data-skin='terminal']) .tab[aria-current='page'] .ico-cell-2,
+html:not([data-skin='terminal']) .tab[aria-current='page'] .ico-cell-3 {
+  transform-box: fill-box;
+  transform-origin: center;
+  animation: m-ico-cell 0.3s cubic-bezier(0.28, 1.55, 0.48, 1) backwards;
+}
+html:not([data-skin='terminal']) .tab[aria-current='page'] .ico-cell-1 {
+  animation-delay: 38ms;
+}
+html:not([data-skin='terminal']) .tab[aria-current='page'] .ico-cell-2 {
+  animation-delay: 76ms;
+}
+html:not([data-skin='terminal']) .tab[aria-current='page'] .ico-cell-3 {
+  animation-delay: 114ms;
+}
+html:not([data-skin='terminal']) .tab[aria-current='page'] .ico-bar-1,
+html:not([data-skin='terminal']) .tab[aria-current='page'] .ico-bar-2,
+html:not([data-skin='terminal']) .tab[aria-current='page'] .ico-bar-3 {
+  transform-box: view-box;
+  transform-origin: 12px 20px;
+  animation: m-ico-bar 0.34s cubic-bezier(0.28, 1.5, 0.48, 1) backwards;
+}
+html:not([data-skin='terminal']) .tab[aria-current='page'] .ico-bar-2 {
+  animation-delay: 48ms;
+}
+html:not([data-skin='terminal']) .tab[aria-current='page'] .ico-bar-3 {
+  animation-delay: 96ms;
+}
+html:not([data-skin='terminal']) .tab[aria-current='page'] .ico-gear {
+  transform-box: view-box;
+  transform-origin: 12px 12px;
+  animation: m-ico-gear 0.4s cubic-bezier(0.28, 1.52, 0.48, 1);
 }
 
 /* 选中科目。标记上的动画挂在圆点 / 提示符上，不占用 .subj-mark 本身（那里有计时中的呼吸） */
@@ -374,6 +450,65 @@ html[data-skin='brutal'] .timer[data-archived] {
   }
   100% {
     transform: translate(0, 0);
+  }
+}
+@keyframes m-keycap-wave {
+  from {
+    opacity: 0;
+    transform: translate(2px, 2px) scale(0.42);
+  }
+}
+@keyframes m-ink-cell {
+  from {
+    opacity: 0;
+    transform: scale(0.62);
+  }
+}
+@keyframes m-spot-wave {
+  0% {
+    scale: 0.84;
+  }
+  62% {
+    scale: 1.09;
+  }
+  100% {
+    scale: 1;
+  }
+}
+@keyframes m-ico-crown {
+  0%,
+  100% {
+    transform: translateY(0);
+  }
+  42% {
+    transform: translateY(1.4px);
+  }
+}
+@keyframes m-ico-spin {
+  from {
+    transform: rotate(0deg);
+  }
+  to {
+    transform: rotate(360deg);
+  }
+}
+@keyframes m-ico-cell {
+  from {
+    opacity: 0.35;
+    transform: scale(0.45);
+  }
+}
+@keyframes m-ico-bar {
+  from {
+    transform: scaleY(0.25);
+  }
+}
+@keyframes m-ico-gear {
+  from {
+    transform: rotate(0deg);
+  }
+  to {
+    transform: rotate(90deg);
   }
 }
 
