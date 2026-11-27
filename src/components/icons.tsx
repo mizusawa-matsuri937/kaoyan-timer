@@ -1,3 +1,6 @@
+import { motion, type Transition } from 'framer-motion'
+import type { SkinId } from '../skin'
+
 type P = { size?: number; className?: string }
 
 const base = (size = 24) => ({
@@ -61,6 +64,43 @@ export const IconPause = ({ size, className }: P) => (
   </svg>
 )
 
+const MORPH_TRANSITION: Record<SkinId, Transition> = {
+  terminal: { duration: 0.08, ease: 'linear' },
+  brutal: { type: 'spring', stiffness: 520, damping: 25 },
+  paper: { duration: 0.25, ease: [0.22, 1, 0.36, 1] },
+}
+
+const PLAY_LEFT = 'M 7 5.2 L 13.7 9.05 L 13.7 14.95 L 7 18.8 Z'
+const PLAY_RIGHT = 'M 13.4 8.9 L 19.4 12 L 19.4 12 L 13.4 15.1 Z'
+const PAUSE_LEFT = 'M 6 5 L 10.2 5 L 10.2 19 L 6 19 Z'
+const PAUSE_RIGHT = 'M 13.8 5 L 18 5 L 18 19 L 13.8 19 Z'
+
+/** Play ↔ Pause 双多边形无缝几何形变图标 */
+export const IconPlayPause = ({
+  paused,
+  skin = 'paper',
+  size = 18,
+  className,
+}: P & { paused: boolean; skin?: SkinId }) => {
+  const transition = MORPH_TRANSITION[skin]
+  return (
+    <motion.svg
+      width={size}
+      height={size}
+      viewBox="0 0 24 24"
+      className={className}
+      fill="currentColor"
+      initial={false}
+      animate={{ scale: paused ? 1 : [0.84, 1] }}
+      transition={transition}
+      aria-hidden
+    >
+      <motion.path initial={false} animate={{ d: paused ? PLAY_LEFT : PAUSE_LEFT }} transition={transition} />
+      <motion.path initial={false} animate={{ d: paused ? PLAY_RIGHT : PAUSE_RIGHT }} transition={transition} />
+    </motion.svg>
+  )
+}
+
 export const IconStop = ({ size, className }: P) => (
   <svg width={size ?? 24} height={size ?? 24} viewBox="0 0 24 24" className={className} fill="currentColor">
     <rect x="6" y="6" width="12" height="12" rx="2.5" />
@@ -94,5 +134,44 @@ export const IconTrash = ({ size, className }: P) => (
 export const IconCloud = ({ size, className }: P) => (
   <svg {...base(size)} className={className}>
     <path d="M7 18a4.5 4.5 0 0 1-.6-8.96A6 6 0 0 1 18 8.5a4.75 4.75 0 0 1-.5 9.5H7z" />
+  </svg>
+)
+
+export const IconEye = ({ size, className }: P) => (
+  <svg {...base(size)} className={className}>
+    <path d="M2.1 12a10.5 10.5 0 0 1 19.8 0 10.5 10.5 0 0 1-19.8 0z" />
+    <circle cx="12" cy="12" r="3" />
+  </svg>
+)
+
+export const IconEyeOff = ({ size, className }: P) => (
+  <svg {...base(size)} className={className}>
+    <path d="M17.9 17.9A10.1 10.1 0 0 1 12 20c-5 0-9.3-3.1-9.9-8a10.4 10.4 0 0 1 4.3-5.9M9.9 4.2A9.8 9.8 0 0 1 12 4c5 0 9.3 3.1 9.9 8a10.5 10.5 0 0 1-1.7 3.8" />
+    <path d="M14.1 14.1a3 3 0 0 1-4.2-4.2" />
+    <path d="M3 3l18 18" />
+  </svg>
+)
+
+export const IconSort = ({ size, className }: P) => (
+  <svg {...base(size)} className={className}>
+    <path d="M7 4v16M7 4L4 7M7 4l3 3" />
+    <path d="M17 20V4M17 20l-3-3M17 20l3-3" />
+  </svg>
+)
+
+export const IconGrip = ({ size = 16, className }: P) => (
+  <svg width={size} height={size} viewBox="0 0 16 16" fill="currentColor" className={className} aria-hidden>
+    <circle cx="5.5" cy="3.5" r="1.25" />
+    <circle cx="10.5" cy="3.5" r="1.25" />
+    <circle cx="5.5" cy="8" r="1.25" />
+    <circle cx="10.5" cy="8" r="1.25" />
+    <circle cx="5.5" cy="12.5" r="1.25" />
+    <circle cx="10.5" cy="12.5" r="1.25" />
+  </svg>
+)
+
+export const IconClose = ({ size = 14, className }: P) => (
+  <svg {...base(size)} className={className}>
+    <path d="M18 6L6 18M6 6l12 12" />
   </svg>
 )

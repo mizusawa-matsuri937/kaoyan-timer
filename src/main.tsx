@@ -8,7 +8,12 @@ import { init, installGlobalListeners } from './store'
 
 initSkin()
 installGlobalListeners()
-void init()
+void init().then(async () => {
+  if (import.meta.env.DEV && import.meta.env.MODE !== 'test') {
+    const { maybeAutoSeedDev } = await import('./devSeed')
+    await maybeAutoSeedDev()
+  }
+})
 
 createRoot(document.getElementById('root')!).render(
   <StrictMode>

@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState, type ReactNode } from 'react'
-import { IconCloud } from '../components/icons'
+import { IconCloud, IconEye, IconEyeOff } from '../components/icons'
 import { SkinPicker } from '../components/SkinPicker'
-import { Button, SectionTitle } from '../components/ui'
+import { Button, SectionTitle, Sheet, Toggle } from '../components/ui'
 import { dayKey } from '../domain/dates'
 import { wakeLockSupported } from '../hooks/useWakeLock'
 import {
@@ -27,11 +27,7 @@ function Row({ label, children, hint }: { label: string; children: ReactNode; hi
   )
 }
 
-function Toggle({ on, onChange }: { on: boolean; onChange: (v: boolean) => void }) {
-  return (
-    <button role="switch" aria-checked={on} onClick={() => onChange(!on)} className="toggle" />
-  )
-}
+const OVERTIME_OPTIONS = [2, 3, 4, 5, 6, 8] as const
 
 const STATUS_TEXT: Record<SyncStatus, string> = {
   disabled: '未开启',
@@ -60,9 +56,17 @@ export function SettingsPage() {
   const [showHelp, setShowHelp] = useState(!cfg)
   const [usage, setUsage] = useState<string | null>(null)
   const [dateDraft, setDateDraft] = useState<Partial<Record<'examDate' | 'startDate', string>>>({})
+  const [showToken, setShowToken] = useState(false)
+  const [pastedToken, setPastedToken] = useState(false)
+  const [confirmDisableSync, setConfirmDisableSync] = useState(false)
+
   const commitDate = async (key: 'examDate' | 'startDate', value: string) => {
     if (value && value !== settings[key]) await updateSettings({ [key]: value })
-    setDateDraft(current => { const next = { ...current }; delete next[key]; return next })
+    setDateDraft((current) => {
+      const next = { ...current }
+      delete next[key]
+      return next
+    })
   }
   const fileRef = useRef<HTMLInputElement>(null)
 
@@ -71,6 +75,12 @@ export function SettingsPage() {
       if (e.usage != null) setUsage(`${(e.usage / 1024).toFixed(0)} KB`)
     })
   }, [count])
+
+  useEffect(() => {
+    if (!pastedToken) return
+    const timer = setTimeout(() => setPastedToken(false), 1800)
+    return () => clearTimeout(timer)
+  }, [pastedToken])
 
   const saveCfg = async () => {
     if (!owner.trim() || !repo.trim() || !token.trim()) return showToast('请填写用户名、仓库名和 Token', 'error')
@@ -120,6 +130,57 @@ export function SettingsPage() {
         </div>
       )}
 
+      {import.meta.env.DEV && import.meta.env.MODE !== 'test' && (
+        <>
+          <SectionTitle>测试沙盒（仅本地开发可见）</SectionTitle>
+          <div className="card p-4 space-y-2.5">
+            <p className="text-xs leading-relaxed text-muted">
+              用于快速体验全部新增交互：灌入近 20 周学习历史、跨午夜与 12 分钟碎片段，并将今日预置为「差一步满 5h 晋级」挂起态。
+            </p>
+            <div className="grid grid-cols-2 gap-2">
+              <Button
+                onClick={async () => {
+                  const { applyDevSeedData } = await import('../devSeed')
+                  await applyDevSeedData()
+                }}
+              >
+                重置全套测试数据
+              </Button>
+              <Button
+                variant="secondary"
+                onClick={() => {
+                  showToast('已保存上一段，开始新科目', 'success', {
+                    action: { label: '撤销', onClick: () => showToast('已演示撤销回调', 'info') },
+                  })
+                  setTimeout(() => showToast('GitHub 自动备份已完成', 'success'), 160)
+                  setTimeout(() => showToast('鼠标移入通知栈可扇形展开并暂停倒计时', 'info'), 320)
+                }}
+              >
+                连发 3 条层叠 Toast
+              </Button>
+              <Button
+                variant="secondary"
+                onClick={async () => {
+                  const { triggerDemoOvertime } = await import('../devSeed')
+                  await triggerDemoOvertime()
+                }}
+              >
+                唤出超时防误关弹窗
+              </Button>
+              <Button
+                variant="danger"
+                onClick={async () => {
+                  const { clearAllDevData } = await import('../devSeed')
+                  await clearAllDevData()
+                }}
+              >
+                清空测试数据
+              </Button>
+            </div>
+          </div>
+        </>
+      )}
+
       <SectionTitle>外观</SectionTitle>
       <SkinPicker />
 
@@ -130,7 +191,7 @@ export function SettingsPage() {
             type="date"
             className="field !w-auto !py-1.5 text-right"
             value={dateDraft.examDate ?? settings.examDate}
-            onChange={(e) => setDateDraft(current => ({ ...current, examDate: e.target.value }))}
+            onChange={(e) => setDateDraft((current) => ({ ...current, examDate: e.target.value }))}
             onBlur={(e) => commitDate('examDate', e.currentTarget.value)}
           />
         </Row>
@@ -139,7 +200,7 @@ export function SettingsPage() {
             type="date"
             className="field !w-auto !py-1.5 text-right"
             value={dateDraft.startDate ?? settings.startDate}
-            onChange={(e) => setDateDraft(current => ({ ...current, startDate: e.target.value }))}
+            onChange={(e) => setDateDraft((current) => ({ ...current, startDate: e.target.value }))}
             onBlur={(e) => commitDate('startDate', e.currentTarget.value)}
           />
         </Row>
@@ -147,22 +208,26 @@ export function SettingsPage() {
 
       <SectionTitle>计时</SectionTitle>
       <div className="card rows px-4">
-        <Row label="忘记结束提醒" hint="单段连续计时超过该时长，回来时询问">
-          <select
-            className="field !w-auto !py-1.5"
-            value={settings.overtimeHours}
-            onChange={(e) => updateSettings({ overtimeHours: Number(e.target.value) })}
-          >
-            {[2, 3, 4, 5, 6, 8].map((h) => (
-              <option key={h} value={h}>
-                {h} 小时
-              </option>
+        <div className="py-3">
+          <div className="text-[15px]">忘记结束提醒</div>
+          <div className="text-xs text-muted">单段连续计时超过该时长，回来时询问</div>
+          <div className="mt-2.5 grid grid-cols-6 gap-1.5" role="group" aria-label="忘记结束提醒小时数">
+            {OVERTIME_OPTIONS.map((h) => (
+              <button
+                key={h}
+                type="button"
+                aria-pressed={settings.overtimeHours === h}
+                onClick={() => updateSettings({ overtimeHours: h })}
+                className="hour-chip num"
+              >
+                {h}h
+              </button>
             ))}
-          </select>
-        </Row>
+          </div>
+        </div>
         {wakeLockSupported && (
           <Row label="计时时屏幕常亮">
-            <Toggle on={settings.keepAwake} onChange={(v) => updateSettings({ keepAwake: v })} />
+            <Toggle label="计时时屏幕常亮" on={settings.keepAwake} onChange={(v) => updateSettings({ keepAwake: v })} />
           </Row>
         )}
       </div>
@@ -192,10 +257,53 @@ export function SettingsPage() {
           </div>
         )}
         <div className="grid gap-2.5">
-          <input className="field" placeholder="GitHub 用户名" value={owner} onChange={(e) => setOwner(e.target.value)} autoCapitalize="off" autoCorrect="off" />
-          <input className="field" placeholder="私有仓库名（如 kaoyan-data）" value={repo} onChange={(e) => setRepo(e.target.value)} autoCapitalize="off" autoCorrect="off" />
-          <input className="field" type="password" placeholder="Fine-grained Token（github_pat_…）" value={token} onChange={(e) => setToken(e.target.value)} autoCapitalize="off" autoCorrect="off" />
-          <input className="field" placeholder="文件名" value={path} onChange={(e) => setPath(e.target.value)} autoCapitalize="off" autoCorrect="off" />
+          <input
+            className="field"
+            placeholder="GitHub 用户名"
+            value={owner}
+            onChange={(e) => setOwner(e.target.value)}
+            autoCapitalize="off"
+            autoCorrect="off"
+          />
+          <input
+            className="field"
+            placeholder="私有仓库名（如 kaoyan-data）"
+            value={repo}
+            onChange={(e) => setRepo(e.target.value)}
+            autoCapitalize="off"
+            autoCorrect="off"
+          />
+          <div className="field-token-wrap">
+            <input
+              className="field !pr-20"
+              type={showToken ? 'text' : 'password'}
+              placeholder="Fine-grained Token（github_pat_…）"
+              value={token}
+              onChange={(e) => setToken(e.target.value)}
+              onPaste={() => setPastedToken(true)}
+              autoCapitalize="off"
+              autoCorrect="off"
+            />
+            <div className="field-token-actions">
+              {pastedToken && <span className="token-pasted-badge">已粘贴</span>}
+              <button
+                type="button"
+                className="field-eye"
+                aria-label={showToken ? '隐藏 Token' : '显示 Token'}
+                onClick={() => setShowToken((v) => !v)}
+              >
+                {showToken ? <IconEyeOff size={16} /> : <IconEye size={16} />}
+              </button>
+            </div>
+          </div>
+          <input
+            className="field"
+            placeholder="文件名"
+            value={path}
+            onChange={(e) => setPath(e.target.value)}
+            autoCapitalize="off"
+            autoCorrect="off"
+          />
         </div>
         <div className="mt-3 grid grid-cols-2 gap-2.5">
           <Button onClick={saveCfg} disabled={sync.status === 'syncing'}>
@@ -207,25 +315,28 @@ export function SettingsPage() {
         </div>
         {cfg && (
           <button
-            className="mt-3 w-full text-center text-xs text-muted"
-            onClick={() => {
-              if (confirm('关闭后不再自动备份（GitHub 上已有的备份不会删除）。确定关闭？')) void setSyncConfig(null)
-            }}
+            type="button"
+            className="mt-3 w-full text-center text-xs text-muted hover:text-danger"
+            onClick={() => setConfirmDisableSync(true)}
           >
             关闭自动备份
           </button>
         )}
-        <button className="mt-3 w-full text-left text-sm font-medium text-accent" onClick={() => setShowHelp(!showHelp)}>
+        <button type="button" className="mt-3 w-full text-left text-sm font-medium text-accent" onClick={() => setShowHelp(!showHelp)}>
           {showHelp ? '收起' : '查看'}设置步骤
         </button>
         <div className="fold" data-open={showHelp ? '' : undefined}>
           <div className="fold-inner">
             <ol className="mt-2 list-decimal space-y-1.5 pl-5 text-[13px] leading-relaxed text-muted">
-              <li>在 GitHub 新建一个 <b>Private</b> 仓库，比如 <code>kaoyan-data</code>（勾选 Add a README 即可）。</li>
+              <li>
+                在 GitHub 新建一个 <b>Private</b> 仓库，比如 <code>kaoyan-data</code>（勾选 Add a README 即可）。
+              </li>
               <li>
                 打开 Settings → Developer settings → Personal access tokens → <b>Fine-grained tokens</b> → Generate new token。
               </li>
-              <li>Repository access 选 <b>Only select repositories</b>，只选这个备份仓库。</li>
+              <li>
+                Repository access 选 <b>Only select repositories</b>，只选这个备份仓库。
+              </li>
               <li>
                 Permissions → Repository permissions → <b>Contents</b> 设为 <b>Read and write</b>，有效期建议选最长或 No
                 expiration。
@@ -269,6 +380,25 @@ export function SettingsPage() {
       </div>
 
       <p className="mt-8 text-center text-xs text-faint">考研计时 v{__APP_VERSION__}</p>
+
+      <Sheet open={confirmDisableSync} onClose={() => setConfirmDisableSync(false)} title="关闭自动备份？">
+        <p className="mb-4 text-[15px] leading-relaxed text-muted">
+          关闭后，本设备后续的学习记录将不再自动同步到 GitHub（仓库里已有的历史备份不会被删除）。确定关闭自动备份吗？
+        </p>
+        <div className="grid gap-2.5">
+          <Button onClick={() => setConfirmDisableSync(false)}>继续保留备份</Button>
+          <Button
+            variant="danger"
+            onClick={() => {
+              setConfirmDisableSync(false)
+              void setSyncConfig(null)
+              showToast('已关闭 GitHub 自动备份', 'info')
+            }}
+          >
+            确认关闭
+          </Button>
+        </div>
+      </Sheet>
     </div>
   )
 }

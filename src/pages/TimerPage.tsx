@@ -1,7 +1,7 @@
 import { AnimatePresence, LayoutGroup, motion } from 'framer-motion'
 import { useCallback, useEffect, useMemo, useRef, useState, type CSSProperties, type PointerEvent } from 'react'
 import { HEAT_VARS } from '../components/Heatmap'
-import { IconPause, IconPlay, IconStop } from '../components/icons'
+import { IconPlayPause, IconStop } from '../components/icons'
 import { SubjectGrid, type SubjectTab } from '../components/SubjectGrid'
 import { TimerDisplay } from '../components/TimerDisplay'
 import { Button, Bar, Sheet, Stat, tint } from '../components/ui'
@@ -10,6 +10,7 @@ import { dayKey, diffDays } from '../domain/dates'
 import { formatDuration, formatDurationCeil, formatHMS } from '../domain/format'
 import { getSubject, isMockSubject, SUBJECTS } from '../domain/subjects'
 import { elapsed, liveSegments } from '../domain/timer'
+import { useAnimatedNumber } from '../hooks/useAnimatedNumber'
 import { useNow } from '../hooks/useNow'
 import { useBaseDaily, useLiveDaily } from '../hooks/useStats'
 import { useWakeLock } from '../hooks/useWakeLock'
@@ -26,12 +27,28 @@ interface ArchiveFeedback {
   color: string
 }
 
+interface LevelUpFx {
+  id: number
+  level: 0 | 1 | 2 | 3 | 4
+}
+
 interface TintWave {
   id: number
   color: string
   x: number
   y: number
 }
+
+const LEVEL_SPARKS = [
+  { dx: '-24px', dy: '-18px', color: 'var(--accent)' },
+  { dx: '26px', dy: '-20px', color: '#f59e0b' },
+  { dx: '34px', dy: '6px', color: '#22c55e' },
+  { dx: '-28px', dy: '14px', color: '#6366f1' },
+  { dx: '8px', dy: '-28px', color: '#ec4899' },
+  { dx: '18px', dy: '22px', color: 'var(--accent)' },
+  { dx: '-10px', dy: '24px', color: '#f59e0b' },
+  { dx: '38px', dy: '-8px', color: '#0ea5e9' },
+]
 
 export function TimerPage() {
   const active = useApp((s) => s.active)
@@ -40,6 +57,7 @@ export function TimerPage() {
   const skin = useSkin()
   const running = !!active && active.runningSince !== null
   const [archived, setArchived] = useState<ArchiveFeedback | null>(null)
+  const [levelUpFx, setLevelUpFx] = useState<LevelUpFx | null>(null)
   const [confirmSwitchId, setConfirmSwitchId] = useState<string | null>(null)
   const [tintWave, setTintWave] = useState<TintWave | null>(null)
   const timerRef = useRef<HTMLElement>(null)
@@ -81,6 +99,7 @@ export function TimerPage() {
 
   const todayStat = daily.get(today)
   const todayTotal = todayStat?.total ?? 0
+  const animatedTodayTotal = useAnimatedNumber(todayTotal, skin)
   const countdown = diffDays(today, settings.examDate)
   const tier = useMemo(() => heatTierProgress(todayTotal), [todayTotal])
   const effectiveStart = useMemo(() => {
@@ -100,6 +119,22 @@ export function TimerPage() {
   // 模拟测试：面板改成整场考试的倒计时，到点只提醒、不自动结束
   const examMs = (subject?.examMinutes ?? 0) * 60000
   const over = !!active && examMs > 0 && ms >= examMs
+
+  // 监测同一天内的热度跨级（无论是专注途中自然跨过门槛，还是结算时跨级），触发右上角高光联动
+  const prevTierRef = useRef<{ day: string; level: 0 | 1 | 2 | 3 | 4 }>({ day: today, level: tier.level })
+  useEffect(() => {
+    const prev = prevTierRef.current
+    if (prev.day === today && tier.level > prev.level) {
+      setLevelUpFx({ id: Date.now(), level: tier.level })
+    }
+    prevTierRef.current = { day: today, level: tier.level }
+  }, [today, tier.level])
+
+  useEffect(() => {
+    if (!levelUpFx) return
+    const timer = setTimeout(() => setLevelUpFx(null), 2800)
+    return () => clearTimeout(timer)
+  }, [levelUpFx])
 
   useEffect(() => {
     if (active) setArchived(null)
@@ -126,12 +161,17 @@ export function TimerPage() {
       const exactTodayTotal = exactDaily.get(today)?.total ?? todayTotal
       const prevLevel = heatLevel(Math.max(0, exactTodayTotal - ms))
       const nextLevel = heatLevel(exactTodayTotal)
+      const leveledUp = nextLevel > prevLevel
+      if (leveledUp) {
+        prevTierRef.current = { day: today, level: nextLevel }
+        setLevelUpFx({ id: Date.now(), level: nextLevel })
+      }
       setArchived({
         id: Date.now(),
         subjectName: subject?.short ?? subject?.name ?? '专注',
         durationMs: ms,
         level: nextLevel,
-        leveledUp: nextLevel > prevLevel,
+        leveledUp,
         color,
       })
     }
@@ -245,6 +285,18 @@ export function TimerPage() {
   const targetSwitchSub = confirmSwitchId ? getSubject(confirmSwitchId) : undefined
   const activeMockSub = active && isMockSubject(active.subjectId) ? getSubject(active.subjectId) : undefined
 
+  const handlePrimaryTimerClick = () => {
+    if (!active) {
+      if (selected) void selectSubjectAndStart(selected)
+    } else if (running) {
+      void pause()
+    } else {
+      void resume()
+    }
+  }
+
+  const primaryLabel = !active ? (examMs ? '开始考试' : '开始') : running ? '暂停' : '继续'
+
   return (
     <div className="px-4 pb-6">
       <header className="grid grid-cols-2 gap-3 pt-2">
@@ -271,19 +323,47 @@ export function TimerPage() {
         />
         <Stat
           label="今日已学"
-          value={formatDuration(todayTotal)}
+          value={formatDuration(animatedTodayTotal)}
           color={active ? color : THEME_GREEN}
+          className={levelUpFx ? 'stat-levelup' : ''}
+          badge={
+            levelUpFx ? (
+              <span key={levelUpFx.id} className="stat-lvl-badge num">
+                {skin === 'terminal' ? `[Lv.${levelUpFx.level}!]` : `晋级 ${LEVEL_LABELS[levelUpFx.level]}`}
+              </span>
+            ) : undefined
+          }
+          overlay={
+            levelUpFx && skin !== 'terminal' ? (
+              <span key={levelUpFx.id} className="lvl-sparks" aria-hidden>
+                {LEVEL_SPARKS.map((sp, idx) => (
+                  <i key={idx} style={{ '--sp-dx': sp.dx, '--sp-dy': sp.dy, '--sp-c': sp.color } as CSSProperties} />
+                ))}
+              </span>
+            ) : undefined
+          }
           footer={
             <div className="stat-sub">
               <Bar pct={tier.pct} height={7} />
               <div className="stat-meta num mt-1.5">
                 <span className="inline-flex min-w-0 items-center gap-1">
-                  <span
-                    className="heat-cell stat-heat-dot"
-                    data-low={tier.level <= 1 ? '' : undefined}
-                    style={{ background: HEAT_VARS[tier.level] }}
-                    aria-hidden
-                  />
+                  <span className="relative inline-flex shrink-0 items-center justify-center">
+                    {levelUpFx && (
+                      <span
+                        key={levelUpFx.id}
+                        className="heat-cell stat-heat-halo"
+                        style={{ background: HEAT_VARS[tier.level] }}
+                        aria-hidden
+                      />
+                    )}
+                    <span
+                      key={levelUpFx ? `sw-${levelUpFx.id}` : undefined}
+                      className={`heat-cell stat-heat-dot ${levelUpFx ? 'stat-heat-stamp' : ''}`.trim()}
+                      data-low={tier.level <= 1 ? '' : undefined}
+                      style={{ background: HEAT_VARS[tier.level] }}
+                      aria-hidden
+                    />
+                  </span>
                   <span className="truncate">
                     {tier.remainMs > 0 ? `差 ${formatDurationCeil(tier.remainMs)} 进 ${tier.nextTierLabel}` : tier.nextTierLabel}
                   </span>
@@ -354,12 +434,12 @@ export function TimerPage() {
               }
               className="overflow-hidden"
             >
-              <div className="finish-banner num" role="status">
+              <div className="finish-banner num" data-levelup={archived.leveledUp ? '' : undefined} role="status">
                 <span className="heat-cell finish-swatch" style={{ background: HEAT_VARS[archived.level] }} aria-hidden />
                 <span>
                   已归档 {archived.subjectName} +{formatDuration(archived.durationMs)}
                   {' · '}
-                  {archived.leveledUp ? `升至「${LEVEL_LABELS[archived.level]}」` : `今日「${LEVEL_LABELS[archived.level]}」`}
+                  {archived.leveledUp ? `🎉 升至「${LEVEL_LABELS[archived.level]}」` : `今日「${LEVEL_LABELS[archived.level]}」`}
                 </span>
               </div>
             </motion.div>
@@ -378,16 +458,10 @@ export function TimerPage() {
                     : { duration: 0.3, ease: [0.22, 1, 0.36, 1] }
               }
             >
-              {!active ? (
-                <Button className="btn-lg w-full" disabled={!selected} onClick={() => selected && selectSubjectAndStart(selected)}>
-                  <IconPlay size={18} /> {examMs ? '开始考试' : '开始'}
-                </Button>
-              ) : (
-                <Button className="btn-lg w-full" onClick={() => (running ? pause() : resume())}>
-                  {running ? <IconPause size={18} /> : <IconPlay size={18} />}
-                  {running ? '暂停' : '继续'}
-                </Button>
-              )}
+              <Button className="btn-lg w-full" disabled={!active && !selected} onClick={handlePrimaryTimerClick}>
+                <IconPlayPause paused={!running} skin={skin} size={18} />
+                {primaryLabel}
+              </Button>
             </motion.div>
             <AnimatePresence mode="popLayout" initial={false}>
               {active && (

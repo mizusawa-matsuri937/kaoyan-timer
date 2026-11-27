@@ -66,7 +66,7 @@ export function OvertimeDialog() {
   const runFor = snapshotNow - since
 
   return (
-    <Sheet open={open} onClose={() => {}} title="还在学习吗？">
+    <Sheet open={open} dismissible={false} onClose={() => {}} title="还在学习吗？">
       <p className="mb-4 text-[15px] leading-relaxed text-muted">
         <b style={{ color: subject?.color }}>{subject?.name}</b> 已经连续计时{' '}
         <b className="text-ink">{formatDurationCN(runFor)}</b>

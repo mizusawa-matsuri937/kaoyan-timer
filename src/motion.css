@@ -118,7 +118,7 @@ html[data-skin='paper'] {
 /* 区块入场。隐藏的页面是 display:none，切回来时动画会自动重播，不需要 JS。
    动的是页面里的各个区块而不是整页：弹层（.overlay）是 fixed 定位，祖先带 transform 的话会被带偏 */
 .page-in > div > :not(.overlay, .subj-groups, .subj-wrap),
-.subj-wrap > .seg,
+.subj-wrap > .subj-toolbar,
 .subj-groups > section {
   animation: var(--m-enter) var(--m-enter-dur) var(--m-enter-ease) backwards;
   animation-delay: calc(var(--m-stagger) * var(--ord, 0));
@@ -152,7 +152,7 @@ html[data-skin='paper'] {
   --ord: 9;
 }
 /* 计时页的科目分栏与科目组接在计时面板后面 */
-.subj-wrap > .seg {
+.subj-wrap > .subj-toolbar {
   --ord: 2;
 }
 .subj-groups > section:nth-child(1) {

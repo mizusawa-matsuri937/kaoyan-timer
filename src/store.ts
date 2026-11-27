@@ -42,6 +42,7 @@ export interface Toast {
   text: string
   kind: 'info' | 'error' | 'success'
   action?: ToastAction
+  durationMs: number
 }
 
 export interface AppState {
@@ -54,6 +55,7 @@ export interface AppState {
   sync: SyncMeta & { status: SyncStatus }
   persisted: boolean
   toast: Toast | null
+  toasts: Toast[]
 }
 
 // 默认初试日期取"明年 12 月 25 日"，保证任何时候新安装都满足"开始不晚于初试"
@@ -95,6 +97,7 @@ let state: AppState = {
   sync: { ...EMPTY_SYNC_META, status: 'disabled' },
   persisted: false,
   toast: null,
+  toasts: [],
 }
 
 const listeners = new Set<() => void>()
@@ -127,16 +130,74 @@ export function useApp<T>(selector: (s: AppState) => T): T {
   )
 }
 
-// ---------- 提示 ----------
+// ---------- 提示（支持 Sonner 式最多 3 层堆叠、悬停暂停倒计时与单条清退） ----------
 
 export const UNDO_WINDOW_MS = 5000
+const MAX_TOASTS = 3
+
+interface ToastTimerEntry {
+  timer?: ReturnType<typeof setTimeout>
+  remainingMs: number
+  startedAt: number
+}
 
 let toastSeq = 0
-let toastTimer: ReturnType<typeof setTimeout> | undefined
-export function dismissToast() {
-  clearTimeout(toastTimer)
-  toastTimer = undefined
-  if (state.toast) setState({ toast: null })
+let toastsPaused = false
+const toastTimers = new Map<number, ToastTimerEntry>()
+
+function commitToasts(next: Toast[]) {
+  if (next.length === 0) toastsPaused = false
+  setState({
+    toasts: next,
+    toast: next.length > 0 ? next[next.length - 1] : null,
+  })
+}
+
+function scheduleToastTimer(id: number, ms: number) {
+  const prev = toastTimers.get(id)
+  if (prev?.timer) clearTimeout(prev.timer)
+  if (toastsPaused) {
+    toastTimers.set(id, { remainingMs: ms, startedAt: Date.now() })
+    return
+  }
+  const timer = setTimeout(() => {
+    toastTimers.delete(id)
+    const filtered = state.toasts.filter((t) => t.id !== id)
+    if (filtered.length !== state.toasts.length) commitToasts(filtered)
+  }, ms)
+  toastTimers.set(id, { timer, remainingMs: ms, startedAt: Date.now() })
+}
+
+export function dismissToast(id?: number) {
+  const targetId = id ?? state.toast?.id
+  if (targetId === undefined) return
+  const entry = toastTimers.get(targetId)
+  if (entry?.timer) clearTimeout(entry.timer)
+  toastTimers.delete(targetId)
+  const next = state.toasts.filter((t) => t.id !== targetId)
+  if (next.length !== state.toasts.length || state.toast !== null) commitToasts(next)
+}
+
+export function pauseToasts() {
+  if (toastsPaused || toastTimers.size === 0) return
+  toastsPaused = true
+  const now = Date.now()
+  for (const [id, entry] of toastTimers) {
+    if (entry.timer) clearTimeout(entry.timer)
+    const elapsedMs = Math.max(0, now - entry.startedAt)
+    toastTimers.set(id, {
+      remainingMs: Math.max(400, entry.remainingMs - elapsedMs),
+      startedAt: now,
+    })
+  }
+}
+
+export function resumeToasts() {
+  if (!toastsPaused) return
+  toastsPaused = false
+  for (const [id, entry] of [...toastTimers.entries()]) {
+    scheduleToastTimer(id, entry.remainingMs)
+  }
 }
 
 export function showToast(
@@ -144,10 +205,34 @@ export function showToast(
   kind: Toast['kind'] = 'info',
   opts?: { action?: ToastAction; durationMs?: number },
 ) {
-  clearTimeout(toastTimer)
-  const duration = opts?.durationMs ?? (opts?.action || kind === 'error' ? UNDO_WINDOW_MS : 2400)
-  setState({ toast: { id: ++toastSeq, text, kind, action: opts?.action } })
-  toastTimer = setTimeout(() => setState({ toast: null }), duration)
+  const durationMs = opts?.durationMs ?? (opts?.action || kind === 'error' ? UNDO_WINDOW_MS : 2400)
+  const item: Toast = { id: ++toastSeq, text, kind, action: opts?.action, durationMs }
+  let list = [...state.toasts]
+  // 新操作产生新的撤销入口时，旧撤销快照已自然失效，直接替换旧撤销条以免混淆
+  if (item.action) {
+    for (const old of list) {
+      if (old.action) {
+        const ent = toastTimers.get(old.id)
+        if (ent?.timer) clearTimeout(ent.timer)
+        toastTimers.delete(old.id)
+      }
+    }
+    list = list.filter((t) => !t.action)
+  }
+  while (list.length >= MAX_TOASTS) {
+    // 优先淘汰不含 action 的普通通知，绝不让后台同步提示把 5 秒撤销按钮顶掉
+    const evictIdx = list.findIndex((t) => !t.action)
+    const targetIdx = evictIdx >= 0 ? evictIdx : 0
+    const [removed] = list.splice(targetIdx, 1)
+    if (removed) {
+      const ent = toastTimers.get(removed.id)
+      if (ent?.timer) clearTimeout(ent.timer)
+      toastTimers.delete(removed.id)
+    }
+  }
+  list.push(item)
+  commitToasts(list)
+  scheduleToastTimer(item.id, durationMs)
 }
 
 function errorText(e: unknown): string {

@@ -100,4 +100,33 @@ describe('计时误触 5 秒撤销机制', () => {
     expect(store.getState().active?.subjectId).toBe('english')
     expect(store.getState().sessions.filter((s) => !s.deleted)).toHaveLength(1)
   })
+
+  it('Sonner 层叠通知：后台普通提示不会顶掉 5 秒撤销条，且支持悬停暂停与恢复倒计时', async () => {
+    await store.selectSubjectAndStart('ds')
+    vi.setSystemTime(T0 + 30 * 60_000)
+    await store.stop()
+
+    const undoToast = store.getState().toasts.find((t) => !!t.action)
+    expect(undoToast).toBeDefined()
+
+    // 连发多条普通提示，含撤销动作的通知始终保留在层叠栈内
+    store.showToast('后台备份已完成', 'success')
+    store.showToast('第一条提示', 'info')
+    store.showToast('第二条提示', 'info')
+    expect(store.getState().toasts.length).toBeLessThanOrEqual(3)
+    expect(store.getState().toasts.some((t) => t.id === undoToast!.id)).toBe(true)
+
+    // 前进 3 秒后悬停暂停，即便过 10 秒也不会自动消失
+    vi.advanceTimersByTime(3000)
+    store.pauseToasts()
+    vi.advanceTimersByTime(10_000)
+    expect(store.getState().toasts.some((t) => t.id === undoToast!.id)).toBe(true)
+
+    // 移开指针恢复倒计时：剩余约 2 秒后自动收起
+    store.resumeToasts()
+    vi.advanceTimersByTime(1500)
+    expect(store.getState().toasts.some((t) => t.id === undoToast!.id)).toBe(true)
+    vi.advanceTimersByTime(600)
+    expect(store.getState().toasts.some((t) => t.id === undoToast!.id)).toBe(false)
+  })
 })

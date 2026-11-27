@@ -1,7 +1,24 @@
-import { memo, useEffect, useLayoutEffect, useMemo, useRef, useState, type CSSProperties, type MouseEvent, type ReactNode } from 'react'
-import { heatLevel, type Daily } from '../domain/aggregate'
-import { addDays, diffDays, parseDay, startOfWeek } from '../domain/dates'
+import {
+  memo,
+  useCallback,
+  useEffect,
+  useLayoutEffect,
+  useMemo,
+  useRef,
+  useState,
+  type CSSProperties,
+  type FocusEvent,
+  type KeyboardEvent,
+  type MouseEvent,
+  type PointerEvent,
+  type ReactNode,
+} from 'react'
+import { heatLevel, LEVEL_LABELS, type Daily } from '../domain/aggregate'
+import { addDays, diffDays, formatDayCN, parseDay, startOfWeek } from '../domain/dates'
+import { formatDuration, formatDurationCN } from '../domain/format'
+import { getSubject } from '../domain/subjects'
 import { useSkin } from '../skin'
+import { tint } from './ui'
 
 /** 格子的最小边长；实际边长按容器宽度略微放大，让可视区正好容纳整数列 */
 const MIN_CELL = 18
@@ -18,6 +35,13 @@ const WEEKDAY_LABELS: Array<[row: number, label: string]> = [
   [6, '日'],
 ]
 
+const SHORT_WEEKDAYS = ['日', '一', '二', '三', '四', '五', '六']
+
+function shortDayLabel(day: string): string {
+  const d = parseDay(day)
+  return `${d.getMonth() + 1}月${d.getDate()}日 周${SHORT_WEEKDAYS[d.getDay()]}`
+}
+
 interface Props {
   daily: Daily
   from: string
@@ -28,7 +52,7 @@ interface Props {
   onSelect: (day: string) => void
 }
 
-/** GitHub 风格热度表：列 = 周（周一开始），行 = 周一…周日 */
+/** GitHub 风格热度表：列 = 周（周一开始），行 = 周一…周日；支持碰撞感知滑行预览气泡与键盘方向键二维漫游 */
 export const Heatmap = memo(function Heatmap({
   daily,
   from,
@@ -39,9 +63,17 @@ export const Heatmap = memo(function Heatmap({
   onSelect,
 }: Props) {
   const skin = useSkin()
+  const heatRef = useRef<HTMLDivElement>(null)
   const scrollRef = useRef<HTMLDivElement>(null)
   const trackRef = useRef<HTMLDivElement>(null)
+  const tipRef = useRef<HTMLDivElement>(null)
+  const activeCellRef = useRef<HTMLElement | null>(null)
   const [viewW, setViewW] = useState(0)
+  const [tipDay, setTipDay] = useState<string | null>(null)
+
+  const activeMax = today < to ? today : to
+  const initialRovingDay = today >= from && today <= activeMax ? today : activeMax >= from ? activeMax : from
+  const rovingDayRef = useRef<string>(initialRovingDay)
 
   useLayoutEffect(() => {
     const el = scrollRef.current
@@ -80,8 +112,9 @@ export const Heatmap = memo(function Heatmap({
     return { cols, gridStart, months }
   }, [from, to])
 
-  // 列内容与选中 / 聚光状态无关：切换聚光时这几百个节点不需要重新渲染
+  // 列内容与选中 / 聚光 / 悬浮气泡状态无关：切换聚光或滑过格子时这几百个节点不需要重新渲染
   const columns = useMemo(() => {
+    rovingDayRef.current = initialRovingDay
     const out: ReactNode[] = []
     for (let c = 0; c < cols; c++) {
       const cells: ReactNode[] = []
@@ -92,15 +125,21 @@ export const Heatmap = memo(function Heatmap({
           continue
         }
         const future = day > today
+        const ms = daily.get(day)?.total ?? 0
+        const lvl = heatLevel(ms)
+        const ariaLabel = future
+          ? `${formatDayCN(day)}，未来日期`
+          : `${formatDayCN(day)}，${ms > 0 ? `学习 ${formatDurationCN(ms)}，等级 ${LEVEL_LABELS[lvl]}` : '未学习'}${day === today ? '，今天' : ''}`
         cells.push(
           <button
             key={r}
             type="button"
+            tabIndex={!future && day === initialRovingDay ? 0 : -1}
             className="heat-cell heat-day"
-            aria-label={day}
+            aria-label={ariaLabel}
             data-day={day}
             data-r={r}
-            data-l={future ? undefined : heatLevel(daily.get(day)?.total ?? 0)}
+            data-l={future ? undefined : lvl}
             data-today={day === today ? '' : undefined}
             disabled={future}
             style={{ '--r': r } as CSSProperties}
@@ -116,9 +155,40 @@ export const Heatmap = memo(function Heatmap({
       )
     }
     return out
-  }, [cols, gridStart, months, daily, from, to, today])
+  }, [cols, gridStart, months, daily, from, to, today, initialRovingDay])
 
   const todayCol = Math.floor(diffDays(gridStart, today) / 7)
+
+  const positionTooltip = useCallback(() => {
+    const heatEl = heatRef.current
+    const cellEl = activeCellRef.current
+    const tipEl = tipRef.current
+    if (!heatEl || !cellEl || !tipEl) return
+    const heatRect = heatEl.getBoundingClientRect()
+    const cellRect = cellEl.getBoundingClientRect()
+    if (heatRect.width === 0 || cellRect.width === 0) return
+
+    const tipW = tipEl.offsetWidth
+    const tipH = tipEl.offsetHeight
+    const cx = cellRect.left - heatRect.left + cellRect.width / 2
+    // Floating UI shift：左右贴边自动夹紧，绝不溢出卡片
+    const clampedX = Math.max(2, Math.min(heatRect.width - tipW - 2, cx - tipW / 2))
+    const arrowX = Math.max(10, Math.min(tipW - 10, cx - clampedX))
+    // Floating UI flip：若贴近视口顶端放不下则翻转到格子下方
+    const flipBottom = cellRect.top < tipH + 14
+    const y = flipBottom
+      ? cellRect.bottom - heatRect.top + 7
+      : cellRect.top - heatRect.top - tipH - 7
+
+    tipEl.dataset.side = flipBottom ? 'bottom' : 'top'
+    tipEl.style.setProperty('--tip-x', `${Math.round(clampedX)}px`)
+    tipEl.style.setProperty('--tip-y', `${Math.round(y)}px`)
+    tipEl.style.setProperty('--tip-arrow', `${Math.round(arrowX)}px`)
+  }, [])
+
+  useLayoutEffect(() => {
+    if (tipDay) positionTooltip()
+  }, [tipDay, positionTooltip])
 
   // 月份标签比一列宽，滚到边缘会被切掉半个字：放不下整个标签时直接隐藏。
   // 同时把当前可视区左起列号写入 --vis-c0，让入场与聚光波浪永远从屏幕可见处即时起跳
@@ -191,12 +261,92 @@ export const Heatmap = memo(function Heatmap({
     const el = scrollRef.current
     // 隐藏时宽度为 0，那时的清零不是用户滚的，不记
     if (el && el.clientWidth > 0 && saved.current) saved.current.left = el.scrollLeft
+    if (tipDay) setTipDay(null)
     syncMonths()
   }
 
+  const updateRovingStop = (nextDay: string) => {
+    const track = trackRef.current
+    if (!track) return
+    const prevBtn = track.querySelector<HTMLButtonElement>(`.heat-day[data-day="${rovingDayRef.current}"]`)
+    const nextBtn = track.querySelector<HTMLButtonElement>(`.heat-day[data-day="${nextDay}"]`)
+    if (!nextBtn || nextBtn.disabled) return
+    if (prevBtn && prevBtn !== nextBtn) prevBtn.tabIndex = -1
+    nextBtn.tabIndex = 0
+    rovingDayRef.current = nextDay
+
+    // 若方向键移动到了可视区外的列，则平滑横向滚入视野
+    const el = scrollRef.current
+    const idx = diffDays(gridStart, nextDay)
+    if (el && idx >= 0 && viewW > 0) {
+      const col = Math.floor(idx / 7)
+      const x = PAD + col * step
+      const lo = el.scrollLeft
+      const hi = lo + el.clientWidth
+      if (x < lo + 2 || x + step - GAP > hi - 2) {
+        const targetLeft = Math.max(0, col - Math.floor(visible / 2)) * step
+        el.scrollLeft = targetLeft
+        if (saved.current) saved.current.left = targetLeft
+        syncMonths()
+      }
+    }
+    nextBtn.focus({ preventScroll: true })
+    activeCellRef.current = nextBtn
+    setTipDay(nextDay)
+  }
+
+  const onKeyDown = (e: KeyboardEvent<HTMLDivElement>) => {
+    const cur = (e.target as HTMLElement).closest<HTMLElement>('[data-day]')?.dataset.day
+    if (!cur || activeMax < from) return
+    let next: string | null = null
+    if (e.key === 'ArrowLeft') next = addDays(cur, -7)
+    else if (e.key === 'ArrowRight') next = addDays(cur, 7)
+    else if (e.key === 'ArrowUp') next = addDays(cur, -1)
+    else if (e.key === 'ArrowDown') next = addDays(cur, 1)
+    else if (e.key === 'Home') next = from
+    else if (e.key === 'End') next = activeMax
+    if (!next) return
+
+    e.preventDefault()
+    if (next < from) next = from
+    if (next > activeMax) next = activeMax
+    if (next !== cur) updateRovingStop(next)
+  }
+
+  const onPointerOver = (e: PointerEvent<HTMLDivElement>) => {
+    if (e.pointerType !== 'mouse' && e.pointerType !== 'pen') return
+    const cell = (e.target as HTMLElement).closest<HTMLButtonElement>('.heat-day[data-day]')
+    if (!cell || cell.disabled || !cell.dataset.day) return
+    activeCellRef.current = cell
+    setTipDay(cell.dataset.day)
+  }
+
+  const onFocus = (e: FocusEvent<HTMLDivElement>) => {
+    const cell = (e.target as HTMLElement).closest<HTMLButtonElement>('.heat-day[data-day]')
+    if (!cell || cell.disabled || !cell.dataset.day) return
+    if (cell.matches?.(':focus-visible')) {
+      activeCellRef.current = cell
+      setTipDay(cell.dataset.day)
+    }
+  }
+
+  const onBlur = (e: FocusEvent<HTMLDivElement>) => {
+    if (!e.currentTarget.contains(e.relatedTarget as Node | null)) {
+      setTipDay(null)
+    }
+  }
+
   const onClick = (e: MouseEvent) => {
-    const day = (e.target as HTMLElement).closest<HTMLElement>('[data-day]')?.dataset.day
-    if (!day) return
+    const cell = (e.target as HTMLElement).closest<HTMLButtonElement>('.heat-day[data-day]')
+    const day = cell?.dataset.day
+    if (!day || cell?.disabled) return
+    if (rovingDayRef.current !== day) {
+      const prevBtn = trackRef.current?.querySelector<HTMLButtonElement>(`.heat-day[data-day="${rovingDayRef.current}"]`)
+      if (prevBtn) prevBtn.tabIndex = -1
+      cell.tabIndex = 0
+      rovingDayRef.current = day
+    }
+    setTipDay(null)
     onSelect(day)
 
     // 点按某天时，向周围 3 格半径内的邻格发射一圈轻量合成层波纹（零 React 重渲染）
@@ -262,8 +412,59 @@ export const Heatmap = memo(function Heatmap({
     }
   }, [sel, viewW, step, visible, skin])
 
+  const tipInfo = useMemo(() => {
+    if (!tipDay) return null
+    const st = daily.get(tipDay)
+    const total = st?.total ?? 0
+    const lvl = heatLevel(total)
+    const topColors = st
+      ? Object.entries(st.bySubject)
+          .filter(([, ms]) => ms > 0)
+          .sort((a, b) => b[1] - a[1])
+          .slice(0, 3)
+          .map(([sid]) => getSubject(sid)?.color)
+          .filter((c): c is string => !!c)
+      : []
+    return {
+      dateLabel: shortDayLabel(tipDay),
+      durLabel: total > 0 ? formatDuration(total) : '未学习',
+      lvl,
+      topColors,
+    }
+  }, [tipDay, daily])
+
   return (
-    <div className="heat" style={{ '--cell': `${step - GAP}px`, '--step': `${step}px` } as CSSProperties}>
+    <div
+      ref={heatRef}
+      className="heat relative"
+      style={{ '--cell': `${step - GAP}px`, '--step': `${step}px` } as CSSProperties}
+      onPointerLeave={() => setTipDay(null)}
+    >
+      {/* 共享锚点碰撞感知悬浮预览气泡 */}
+      <div
+        ref={tipRef}
+        className="heat-tooltip num"
+        data-open={tipInfo ? '' : undefined}
+        aria-hidden
+      >
+        {tipInfo && (
+          <>
+            <span className="heat-cell h-2.5 w-2.5 shrink-0" style={{ background: HEAT_VARS[tipInfo.lvl] }} />
+            <span>{tipInfo.dateLabel}</span>
+            <span className="heat-tip-sep">·</span>
+            <span className="font-bold">{tipInfo.durLabel}</span>
+            {tipInfo.topColors.length > 0 && (
+              <span className="ml-0.5 inline-flex items-center gap-1">
+                {tipInfo.topColors.map((c, idx) => (
+                  <i key={idx} className="c dot !h-1.5 !w-1.5" style={tint(c)} />
+                ))}
+              </span>
+            )}
+            <span className="heat-tooltip-arrow" />
+          </>
+        )}
+      </div>
+
       {/* 星期标签固定在左侧，不随横向滚动 */}
       <div className="heat-weekdays" aria-hidden>
         {WEEKDAY_LABELS.map(([row, label]) => (
@@ -275,9 +476,15 @@ export const Heatmap = memo(function Heatmap({
       <div ref={scrollRef} className="heat-scroll no-scrollbar" onScroll={onScroll}>
         <div
           ref={trackRef}
+          role="grid"
+          aria-label="每日学习热度网格（可用方向键切换日期）"
           className="heat-track"
           data-spot={spotlightLevel != null ? String(spotlightLevel) : undefined}
           onClick={onClick}
+          onPointerOver={onPointerOver}
+          onKeyDown={onKeyDown}
+          onFocus={onFocus}
+          onBlur={onBlur}
         >
           {columns}
           {sel >= 0 && (

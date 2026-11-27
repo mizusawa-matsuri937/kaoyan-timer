@@ -1,4 +1,4 @@
-import { useEffect, useId, useMemo, useRef } from 'react'
+import { useEffect, useId, useMemo, useRef, useState, type PointerEvent } from 'react'
 import { partitionRingSpans, type DaySlice } from '../domain/aggregate'
 import { addDays, formatClock, parseDay } from '../domain/dates'
 import { formatDuration } from '../domain/format'
@@ -16,7 +16,7 @@ const CARDINALS = [
   { deg: 270, label: '18' },
 ] as const
 const HOURS_24 = Array.from({ length: 24 }, (_, h) => h)
-const DOTS_3H = [0, 3, 6, 9, 12, 15, 18, 21]
+const DETENT_48 = Array.from({ length: 48 }, (_, i) => i * 7.5)
 
 function polar(cx: number, cy: number, r: number, deg: number): [number, number] {
   const rad = ((deg - 90) * Math.PI) / 180
@@ -55,6 +55,19 @@ function nextShortestAngle(prev: number | null, targetDeg: number): number {
   return prev + delta
 }
 
+function circularDist(a: number, b: number): number {
+  const d = Math.abs(a - b) % 360
+  return d > 180 ? 360 - d : d
+}
+
+function degToClock(deg: number): string {
+  const norm = ((deg % 360) + 360) % 360
+  const totalMin = Math.min(1439, Math.round((norm / 360) * 1440))
+  const hh = String(Math.floor(totalMin / 60)).padStart(2, '0')
+  const mm = String(totalMin % 60).padStart(2, '0')
+  return `${hh}:${mm}`
+}
+
 function prefersReducedMotion(): boolean {
   return typeof window !== 'undefined' && window.matchMedia?.('(prefers-reduced-motion: reduce)').matches
 }
@@ -64,7 +77,7 @@ function readDimOpacity(): number {
   return 0.56
 }
 
-/** 00:00–24:00 三皮肤专属圆环时间轴：上方居中大圆环 + 底部详情与逐段切换，零滚动跳动 */
+/** 00:00–24:00 三皮肤专属圆环时间轴：支持指尖旋转刻度拨盘（磁吸寻段）+ 逐段微调，零滚动跳动 */
 export function DayTimelineRing({
   day,
   slices,
@@ -85,6 +98,15 @@ export function DayTimelineRing({
   const sideRef = useRef<HTMLDivElement>(null)
   const pointerAngleRef = useRef<number | null>(null)
   const mountedKeyRef = useRef<string | null>(null)
+  const scrubRef = useRef<{
+    pointerId: number
+    x0: number
+    y0: number
+    dragging: boolean
+    lastKey: string | null
+  } | null>(null)
+  const suppressClickRef = useRef(false)
+  const [scrubDeg, setScrubDeg] = useState<number | null>(null)
 
   const dimOp = readDimOpacity()
   const dayEndTs = useMemo(() => parseDay(addDays(day, 1)).getTime(), [day])
@@ -104,16 +126,29 @@ export function DayTimelineRing({
   }
 
   let targetAngle = pointerAngleRef.current ?? 0
-  if (selectedSlice) {
+  if (scrubDeg !== null) {
+    targetAngle = nextShortestAngle(pointerAngleRef.current, scrubDeg)
+    pointerAngleRef.current = targetAngle
+  } else if (selectedSlice) {
     const midDeg = ((selectedSlice.startFrac + selectedSlice.endFrac) / 2) * 360
     targetAngle = nextShortestAngle(pointerAngleRef.current, midDeg)
     pointerAngleRef.current = targetAngle
   }
+  const activeClockDeg = scrubDeg ?? (selectedSlice ? ((selectedSlice.startFrac + selectedSlice.endFrac) / 2) * 360 : null)
 
   const { studySpans, restSpans } = useMemo(
     () => (skin === 'brutal' ? partitionRingSpans(slices, 3.4) : { studySpans: [], restSpans: [] }),
     [skin, slices],
   )
+
+  const hitSpans = useMemo(() => {
+    if (skin === 'brutal') return studySpans
+    return slices.map((slice) => {
+      const vStart = slice.startFrac * 360
+      const vEnd = Math.max(vStart + 2.0, slice.endFrac * 360)
+      return { slice, vStart, vEnd }
+    })
+  }, [skin, studySpans, slices])
 
   // 右侧空白区汇总：首末跨度 + 四时段分布 + 涉及科目
   const summary = useMemo(() => {
@@ -283,13 +318,14 @@ export function DayTimelineRing({
     }
   }, [day, skin])
 
-  // 选中切换动效：右侧详情浮现 / 扫描打印 / 终端弧段闪烁
+  // 选中切换动效（拨盘连续拖动期间不重复触发闪烁，松手或点选时才轻快反馈）
   useEffect(() => {
     const curMount = `${day}|${skin}`
     if (mountedKeyRef.current !== curMount) {
       mountedKeyRef.current = curMount
       return
     }
+    if (scrubRef.current?.dragging) return
     const side = sideRef.current
     if (!side || typeof side.animate !== 'function' || prefersReducedMotion()) return
 
@@ -351,6 +387,85 @@ export function DayTimelineRing({
     }
   }, [selectedKey, day, skin])
 
+  const matchSliceByDeg = (deg: number): { slice: DaySlice; snapDeg: number } | null => {
+    for (const sp of hitSpans) {
+      if (deg >= sp.vStart && deg <= sp.vEnd) {
+        const span = sp.vEnd - sp.vStart
+        return { slice: sp.slice, snapDeg: span < 9 ? (sp.vStart + sp.vEnd) / 2 : deg }
+      }
+    }
+    let best: { slice: DaySlice; snapDeg: number; dist: number } | null = null
+    const CAPTURE_DEG = 6.2
+    for (const sp of hitSpans) {
+      const dStart = circularDist(deg, sp.vStart)
+      const dEnd = circularDist(deg, sp.vEnd)
+      const d = Math.min(dStart, dEnd)
+      if (d <= CAPTURE_DEG && (!best || d < best.dist)) {
+        const mid = (sp.vStart + sp.vEnd) / 2
+        const span = sp.vEnd - sp.vStart
+        const clamped = span < 9 ? mid : dStart <= dEnd ? sp.vStart + 0.8 : sp.vEnd - 0.8
+        best = { slice: sp.slice, snapDeg: clamped, dist: d }
+      }
+    }
+    return best ? { slice: best.slice, snapDeg: best.snapDeg } : null
+  }
+
+  const updateScrubAt = (clientX: number, clientY: number) => {
+    const el = dialRef.current
+    if (!el) return
+    const rect = el.getBoundingClientRect()
+    if (rect.width === 0 || rect.height === 0) return
+    const dx = clientX - (rect.left + rect.width / 2)
+    const dy = clientY - (rect.top + rect.height / 2)
+    let deg = (Math.atan2(dy, dx) * 180) / Math.PI + 90
+    if (deg < 0) deg += 360
+
+    const hit = matchSliceByDeg(deg)
+    const visDeg = hit ? hit.snapDeg : deg
+    setScrubDeg(visDeg)
+
+    const nextKey = hit ? hit.slice.key : null
+    if (scrubRef.current && nextKey !== scrubRef.current.lastKey) {
+      scrubRef.current.lastKey = nextKey
+      if (nextKey !== null) navigator.vibrate?.(6)
+      onSelectKey(nextKey)
+    }
+  }
+
+  const onDialPointerDown = (e: PointerEvent<HTMLDivElement>) => {
+    scrubRef.current = {
+      pointerId: e.pointerId,
+      x0: e.clientX,
+      y0: e.clientY,
+      dragging: false,
+      lastKey: selectedKey,
+    }
+  }
+
+  const onDialPointerMove = (e: PointerEvent<HTMLDivElement>) => {
+    const st = scrubRef.current
+    if (!st || st.pointerId !== e.pointerId) return
+    if (!st.dragging) {
+      if (Math.hypot(e.clientX - st.x0, e.clientY - st.y0) < 5) return
+      st.dragging = true
+      dialRef.current?.setPointerCapture?.(e.pointerId)
+    }
+    updateScrubAt(e.clientX, e.clientY)
+  }
+
+  const endDialPointer = (e: PointerEvent<HTMLDivElement>) => {
+    const st = scrubRef.current
+    if (!st || st.pointerId !== e.pointerId) return
+    if (st.dragging) {
+      suppressClickRef.current = true
+      setTimeout(() => {
+        suppressClickRef.current = false
+      }, 40)
+    }
+    scrubRef.current = null
+    setScrubDeg(null)
+  }
+
   const stepSlice = (dir: -1 | 1) => {
     if (slices.length === 0) return
     if (selectedIndex < 0) {
@@ -372,21 +487,49 @@ export function DayTimelineRing({
         ? `${selectedIndex + 1}/${slices.length}`
         : `${slices.length}段`
 
+  const isScrubbing = scrubDeg !== null
+  const showIndicator = !!selectedSlice || isScrubbing
+
   return (
-    <div className="day-ring day-ring-box px-3.5 pt-3 pb-3" onClick={() => onSelectKey(null)}>
+    <div
+      className="day-ring day-ring-box px-3.5 pt-3 pb-3"
+      onClick={() => {
+        if (!suppressClickRef.current) onSelectKey(null)
+      }}
+    >
       {skin === 'terminal' && <span className="day-ring-legend">24h_TIMELINE</span>}
 
-      {/* 上方居中大圆环（圆心保持留白） */}
+      {/* 上方居中大圆环（支持按住绕圈指尖刻度拨盘寻段，data-no-day-swipe 隔离外层左右滑页） */}
       <div className="flex justify-center pb-1.5">
-        <div ref={dialRef} className="relative h-[212px] w-[212px] shrink-0">
-          <svg ref={svgRef} viewBox="0 0 152 152" className="h-full w-full overflow-visible" aria-label="00:00至24:00学习时间圆环">
+        <div
+          ref={dialRef}
+          data-no-day-swipe=""
+          className="relative h-[212px] w-[212px] shrink-0 touch-none select-none cursor-grab active:cursor-grabbing"
+          onPointerDown={onDialPointerDown}
+          onPointerMove={onDialPointerMove}
+          onPointerUp={endDialPointer}
+          onPointerCancel={endDialPointer}
+        >
+          <svg ref={svgRef} viewBox="0 0 152 152" className="h-full w-full overflow-visible" aria-label="00:00至24:00学习时间圆环（可按住绕圈拨动寻段）">
             {skin === 'paper' && (
               <>
                 <circle cx={CX} cy={CY} r={54} fill="none" stroke="var(--surface-3)" strokeWidth={13.5} />
                 <circle cx={CX} cy={CY} r={43} fill="none" stroke="var(--line)" strokeWidth={0.75} />
-                {DOTS_3H.map((h) => {
-                  const [x, y] = polar(CX, CY, 43, h * 15)
-                  return <circle key={h} cx={x} cy={y} r={h % 6 === 0 ? 1.3 : 0.75} fill="var(--faint)" />
+                {DETENT_48.map((deg, idx) => {
+                  const major = idx % 6 === 0
+                  const near = activeClockDeg !== null && circularDist(deg, activeClockDeg) < 11
+                  if (!major && !near) return null
+                  const [x, y] = polar(CX, CY, 43, deg)
+                  return (
+                    <circle
+                      key={idx}
+                      cx={x}
+                      cy={y}
+                      r={near ? 1.65 : idx % 12 === 0 ? 1.3 : 0.75}
+                      fill={near ? 'var(--c-ring, var(--accent))' : 'var(--faint)'}
+                      opacity={near ? 1 : 0.75}
+                    />
+                  )
                 })}
                 {CARDINALS.map((c) => {
                   const [x, y] = polar(CX, CY, 69.5, c.deg)
@@ -444,6 +587,7 @@ export function DayTimelineRing({
                         className="cursor-pointer"
                         onClick={(e) => {
                           e.stopPropagation()
+                          if (suppressClickRef.current) return
                           onSelectKey(selectedKey === s.key ? null : s.key)
                         }}
                       />
@@ -452,14 +596,15 @@ export function DayTimelineRing({
                 })}
                 <g
                   className={`day-ring-bead ${selSub ? 'c' : ''}`}
+                  data-scrubbing={isScrubbing ? '' : undefined}
                   style={{
                     ...(selSub ? tint(selSub.color) : undefined),
-                    opacity: selectedSlice ? 1 : 0,
+                    opacity: showIndicator ? 1 : 0,
                     transform: `rotate(${targetAngle.toFixed(1)}deg)`,
                   }}
                   pointerEvents="none"
                 >
-                  <circle cx={CX} cy={CY - 43} r={3.1} fill="var(--c-ring, var(--accent))" stroke="var(--surface-2)" strokeWidth={1.35} />
+                  <circle cx={CX} cy={CY - 43} r={isScrubbing ? 3.8 : 3.1} fill="var(--c-ring, var(--accent))" stroke="var(--surface-2)" strokeWidth={1.35} />
                 </g>
               </>
             )}
@@ -481,8 +626,9 @@ export function DayTimelineRing({
                   const deg = h * 15
                   const major = h % 6 === 0
                   const mid = h % 3 === 0
-                  const [x1, y1] = polar(CX, CY, 44.5 - (major ? 4.8 : mid ? 3.0 : 1.7), deg)
-                  const [x2, y2] = polar(CX, CY, 44.5 + (major ? 1.4 : 0), deg)
+                  const near = activeClockDeg !== null && circularDist(deg, activeClockDeg) < 12
+                  const [x1, y1] = polar(CX, CY, 44.5 - (near ? 5.6 : major ? 4.8 : mid ? 3.0 : 1.7), deg)
+                  const [x2, y2] = polar(CX, CY, 44.5 + (major || near ? 1.4 : 0), deg)
                   return (
                     <line
                       key={h}
@@ -490,8 +636,8 @@ export function DayTimelineRing({
                       y1={y1}
                       x2={x2}
                       y2={y2}
-                      stroke={major ? 'var(--muted)' : 'var(--faint)'}
-                      strokeWidth={major ? 1.2 : 0.75}
+                      stroke={near ? 'var(--accent)' : major ? 'var(--muted)' : 'var(--faint)'}
+                      strokeWidth={near ? 1.6 : major ? 1.2 : 0.75}
                     />
                   )
                 })}
@@ -541,6 +687,7 @@ export function DayTimelineRing({
                         className="cursor-pointer"
                         onClick={(e) => {
                           e.stopPropagation()
+                          if (suppressClickRef.current) return
                           onSelectKey(selectedKey === s.key ? null : s.key)
                         }}
                       />
@@ -553,9 +700,10 @@ export function DayTimelineRing({
                 </g>
                 <g
                   className={`day-ring-pointer ${selSub ? 'c' : ''}`}
+                  data-scrubbing={isScrubbing ? '' : undefined}
                   style={{
                     ...(selSub ? tint(selSub.color) : undefined),
-                    opacity: selectedSlice ? 1 : 0,
+                    opacity: showIndicator ? 1 : 0,
                     transform: `rotate(${targetAngle.toFixed(1)}deg)`,
                   }}
                   pointerEvents="none"
@@ -585,6 +733,25 @@ export function DayTimelineRing({
                     >
                       {c.label}
                     </text>
+                  )
+                })}
+                {HOURS_24.map((h) => {
+                  const deg = h * 15
+                  const near = activeClockDeg !== null && circularDist(deg, activeClockDeg) < 12
+                  if (!near && h % 3 !== 0) return null
+                  const [x1, y1] = polar(CX, CY, near ? 34.5 : 37, deg)
+                  const [x2, y2] = polar(CX, CY, 39.5, deg)
+                  return (
+                    <line
+                      key={h}
+                      x1={x1}
+                      y1={y1}
+                      x2={x2}
+                      y2={y2}
+                      stroke={near ? 'var(--text)' : 'var(--muted)'}
+                      strokeWidth={near ? 2.1 : 1.2}
+                      opacity={near ? 1 : 0.45}
+                    />
                   )
                 })}
                 {restSpans.map((r, idx) => (
@@ -620,6 +787,7 @@ export function DayTimelineRing({
                       style={{ ...tint(sub?.color ?? THEME_GREEN), transform: tf, opacity: op }}
                       onClick={(e) => {
                         e.stopPropagation()
+                        if (suppressClickRef.current) return
                         onSelectKey(selectedKey === s.key ? null : s.key)
                       }}
                     >
@@ -634,6 +802,18 @@ export function DayTimelineRing({
                     </g>
                   )
                 })}
+                <g
+                  className={`day-ring-bead ${selSub ? 'c' : ''}`}
+                  data-scrubbing={isScrubbing ? '' : undefined}
+                  style={{
+                    ...(selSub ? tint(selSub.color) : undefined),
+                    opacity: isScrubbing ? 1 : 0,
+                    transform: `rotate(${targetAngle.toFixed(1)}deg)`,
+                  }}
+                  pointerEvents="none"
+                >
+                  <circle cx={CX} cy={CY - 35.5} r={3.6} fill="var(--accent-fill)" stroke="var(--border)" strokeWidth={1.8} />
+                </g>
               </>
             )}
           </svg>
@@ -729,6 +909,14 @@ export function DayTimelineRing({
                 </div>
               </div>
             )
+          ) : isScrubbing && scrubDeg !== null ? (
+            <div>
+              <div className="num flex items-center gap-1.5 text-sm font-semibold">
+                <span>{skin === 'terminal' ? `$ ${degToClock(scrubDeg)} · IDLE` : `${degToClock(scrubDeg)} · 空闲时段`}</span>
+                {skin === 'terminal' && <span className="day-ring-cursor" />}
+              </div>
+              <div className="mt-0.5 truncate text-[11px] text-faint">继续旋转拨盘靠近学习弧段即可磁吸锁定</div>
+            </div>
           ) : skin === 'terminal' ? (
             <div>
               <div className="num flex items-center gap-1.5 text-sm font-bold">

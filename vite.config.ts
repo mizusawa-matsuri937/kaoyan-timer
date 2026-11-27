@@ -9,6 +9,9 @@ const base = process.env.BASE_PATH ?? '/kaoyan-timer/'
 
 export default defineConfig({
   base,
+  server: {
+    host: true,
+  },
   define: {
     __APP_VERSION__: JSON.stringify(process.env.npm_package_version ?? '1.0.0'),
   },
