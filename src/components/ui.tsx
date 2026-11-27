@@ -42,18 +42,22 @@ export function Sheet({
   onClose,
   title,
   dismissible = true,
+  flushBody = false,
   children,
 }: {
   open: boolean
   onClose: () => void
   title?: ReactNode
   dismissible?: boolean
+  flushBody?: boolean
   children: ReactNode
 }) {
   const skin = useSkin()
   const titleId = useId()
   const controls = useDragControls()
   const sheetRef = useRef<HTMLDivElement>(null)
+  const onCloseRef = useRef(onClose)
+  onCloseRef.current = onClose
   const [nudgeSeq, setNudgeSeq] = useState(0)
 
   const triggerNudge = () => setNudgeSeq((n) => n + 1)
@@ -67,7 +71,7 @@ export function Sheet({
     const onKeyDown = (e: KeyboardEvent) => {
       if (e.key === 'Escape') {
         e.preventDefault()
-        if (dismissible) onClose()
+        if (dismissible) onCloseRef.current()
         else triggerNudge()
       }
     }
@@ -78,7 +82,7 @@ export function Sheet({
       if (typeof window !== 'undefined') window.removeEventListener('keydown', onKeyDown)
       prevFocus?.focus?.()
     }
-  }, [open, dismissible, onClose])
+  }, [open, dismissible])
 
   return (
     <AnimatePresence>
@@ -124,9 +128,15 @@ export function Sheet({
                   </div>
                 )}
               </div>
-              <div className="overflow-y-auto overscroll-contain px-5 pb-6" style={{ maxHeight: 'calc(88dvh - 70px)' }}>
-                {children}
-              </div>
+              {flushBody ? (
+                <div className="overflow-hidden" style={{ height: 'min(calc(84dvh - 70px), 680px)' }}>
+                  {children}
+                </div>
+              ) : (
+                <div className="overflow-y-auto overscroll-contain px-5 pb-6" style={{ maxHeight: 'calc(88dvh - 70px)' }}>
+                  {children}
+                </div>
+              )}
             </div>
           </motion.div>
         </motion.div>

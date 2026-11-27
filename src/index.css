@@ -3003,19 +3003,17 @@ code {
     font-size: 13px;
   }
 
-  /* 24h 圆环拨盘零延迟跟随 & DaySheet 左右滑页回弹 */
+  /* 24h 圆环拨盘零延迟跟随 & DaySheet 三页无缝左右滑页 */
   .day-ring-bead[data-scrubbing],
   .day-ring-pointer[data-scrubbing] {
     transition: opacity 0.12s ease !important;
   }
-  .day-sheet-pan {
-    transition: transform 0.24s cubic-bezier(0.22, 1, 0.36, 1);
+  .day-pager-track {
+    will-change: transform;
   }
-  [data-skin='terminal'] .day-sheet-pan {
-    transition: transform 0.12s steps(3);
-  }
-  [data-skin='brutal'] .day-sheet-pan {
-    transition: transform 0.24s cubic-bezier(0.28, 1.45, 0.48, 1);
+  .day-pager-slide {
+    -webkit-overflow-scrolling: touch;
+    touch-action: pan-y;
   }
 
   /* 热度表碰撞感知悬浮预览气泡 & 键盘漫游焦点框 */

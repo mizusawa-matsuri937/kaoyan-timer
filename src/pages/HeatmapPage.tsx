@@ -1,12 +1,13 @@
-import { useMemo, useRef, useState } from 'react'
+import { useCallback, useMemo, useRef, useState } from 'react'
 import { DaySheet } from '../components/DaySheet'
 import { HEAT_VARS, HeatLegend, Heatmap } from '../components/Heatmap'
 import { SessionEditor, type EditorTarget } from '../components/SessionEditor'
 import { Bar, SectionTitle, Stat } from '../components/ui'
-import { LEVEL_LABELS, levelCounts, sessionsOnDay } from '../domain/aggregate'
+import { LEVEL_LABELS, levelCounts } from '../domain/aggregate'
 import { dayKey, diffDays } from '../domain/dates'
 import { formatDuration } from '../domain/format'
 import { liveSegments } from '../domain/timer'
+import type { Session } from '../domain/types'
 import { useNow } from '../hooks/useNow'
 import { useLiveDaily, useVisibleSessions } from '../hooks/useStats'
 import { useApp } from '../store'
@@ -43,7 +44,9 @@ export function HeatmapPage() {
   let totalMs = 0
   for (const [d, st] of daily) if (d >= from && d <= countTo) totalMs += st.total
 
-  const daySessions = useMemo(() => (selected ? sessionsOnDay(sessions, selected) : []), [sessions, selected])
+  const closeDaySheet = useCallback(() => setSelected(null), [])
+  const editSession = useCallback((s: Session) => setEditor({ kind: 'edit', session: s }), [])
+  const addSession = useCallback((day: string) => setEditor({ kind: 'new', day }), [])
 
   const toggleSpotlight = (lvl: number) => {
     const next = spotlight === lvl ? null : lvl
@@ -135,15 +138,15 @@ export function HeatmapPage() {
 
       <DaySheet
         day={editor ? null : selected}
-        stat={selected ? daily.get(selected) : undefined}
-        sessions={daySessions}
+        daily={daily}
+        sessions={sessions}
         live={live}
         minDay={from}
         maxDay={countTo}
         onSelectDay={setSelected}
-        onClose={() => setSelected(null)}
-        onEdit={(s) => setEditor({ kind: 'edit', session: s })}
-        onAdd={(day) => setEditor({ kind: 'new', day })}
+        onClose={closeDaySheet}
+        onEdit={editSession}
+        onAdd={addSession}
       />
       <SessionEditor target={editor} onClose={() => setEditor(null)} />
     </div>

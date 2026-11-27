@@ -83,11 +83,13 @@ export function DayTimelineRing({
   slices,
   selectedKey,
   onSelectKey,
+  animateEntrance = true,
 }: {
   day: string
   slices: DaySlice[]
   selectedKey: string | null
   onSelectKey: (key: string | null) => void
+  animateEntrance?: boolean
 }) {
   const skin = useSkin()
   useMode() // 明暗切换时触发重渲染，保证对比度令牌同步
@@ -186,12 +188,14 @@ export function DayTimelineRing({
     return { spanText, periodText, subjects }
   }, [slices, dayEndTs])
 
-  // 入场动画：按皮肤区分
+  // 入场动画：按皮肤区分（左右切天预渲染与滑入页跳过入场，避免每次切天重绘闪烁）
   useEffect(() => {
+    if (!animateEntrance) return
     const svg = svgRef.current
     if (!svg || typeof svg.animate !== 'function' || prefersReducedMotion()) return
 
     const handles: Animation[] = []
+    const resetDash: SVGPathElement[] = []
     const track = (anim: Animation | undefined) => {
       if (anim) handles.push(anim)
       return anim
@@ -202,6 +206,7 @@ export function DayTimelineRing({
       arcs.forEach((arc, i) => {
         const targetOp = arc.dataset.targetOp ?? '1'
         arc.style.strokeDasharray = '1'
+        resetDash.push(arc)
         const anim = track(
           arc.animate(
             [
@@ -315,8 +320,9 @@ export function DayTimelineRing({
           /* ignore */
         }
       }
+      for (const arc of resetDash) arc.style.strokeDasharray = ''
     }
-  }, [day, skin])
+  }, [day, skin, animateEntrance])
 
   // 选中切换动效（拨盘连续拖动期间不重复触发闪烁，松手或点选时才轻快反馈）
   useEffect(() => {

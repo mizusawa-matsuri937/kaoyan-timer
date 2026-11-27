@@ -202,6 +202,10 @@ html[data-skin='terminal'] .page-in > div > h1.page-title {
   animation: var(--m-bar) var(--m-bar-dur) var(--m-bar-ease) backwards;
   animation-delay: calc(var(--m-stagger) * var(--ord, 0) + 80ms);
 }
+/* 每日详情左右切天预渲染与滑入页不再重播入场长条动效，避免切天重绘闪烁 */
+.day-pager-slide[data-static] .bar > i {
+  animation: none;
+}
 
 /* 热度表：利用当前可视区左起列 --vis-c0 算对角线序号，只让屏幕可见列排开斜向多米诺波浪，播完不留合成层 */
 .heat-scroll {
