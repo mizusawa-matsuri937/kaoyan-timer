@@ -2,60 +2,21 @@ import { memo, useEffect, useId, useRef, useState } from 'react'
 import { HOUR } from '../domain/aggregate'
 import { formatHMS } from '../domain/format'
 import type { SkinId } from '../skin'
+import { OdometerDigit } from './Odometer'
 
 const SEGS = 30 // 一行 30 格 = 1 小时，每格 2 分钟
 
-/**
- * 单个数字滚轮槽：首次挂载 / 服务端渲染只输出 .d（不破坏读屏与静态标记），
- * 客户端数字变化时同一帧挂载离场的旧数字 .d-out 与入场的新数字 .d，实现无闪烁滚轮换字。
- */
-function DigitSlot({ ch }: { ch: string }) {
-  const committedRef = useRef<{ cur: string; prev: string | null; seq: number }>({
-    cur: ch,
-    prev: null,
-    seq: 0,
-  })
+const cells = (s: string, skin: SkinId, rising: boolean, offset = 0) =>
+  [...s].map((ch, i) => <OdometerDigit key={offset + i} ch={ch} skin={skin} rising={rising} />)
 
-  let { cur, prev, seq } = committedRef.current
-  if (cur !== ch) {
-    prev = cur
-    cur = ch
-    seq += 1
-  }
-
-  useEffect(() => {
-    committedRef.current = { cur, prev, seq }
-  }, [cur, prev, seq])
-
-  if (ch === ':') {
-    return <span className="d-sep">:</span>
-  }
-
-  return (
-    <span className="d-slot">
-      {prev !== null && (
-        <span key={`out-${seq}`} className="d-out" aria-hidden>
-          {prev}
-        </span>
-      )}
-      <span key={`in-${seq}-${ch}`} className="d">
-        {ch}
-      </span>
-    </span>
-  )
-}
-
-const cells = (s: string, offset = 0) =>
-  [...s].map((ch, i) => <DigitSlot key={offset + i} ch={ch} />)
-
-/** 时分 + 弱化的秒；逐字符定宽滚轮，跳秒不位移不闪烁 */
-function Digits({ ms }: { ms: number }) {
+/** 时分 + 弱化的秒；真实 11 格（0–9–0）机械里程表滚轮，正计时上滚、模考倒计时下滚，零位移无闪烁 */
+function Digits({ ms, skin, rising }: { ms: number; skin: SkinId; rising: boolean }) {
   const hms = formatHMS(ms)
   const cut = hms.length - 3
   return (
     <div className="timer-digits" role="timer">
-      {cells(hms.slice(0, cut), 0)}
-      <span className="sec">{cells(hms.slice(cut), cut)}</span>
+      {cells(hms.slice(0, cut), skin, rising, 0)}
+      <span className="sec">{cells(hms.slice(cut), skin, rising, cut)}</span>
     </div>
   )
 }
@@ -203,6 +164,8 @@ export function TimerDisplay({
     prevDialRef.current = { ms, progress, active, lap }
   }, [ms, progress, active, lap, exam, hourWaveKey])
 
+  const rising = !exam || over
+
   if (skin === 'terminal') {
     const caption = exam
       ? active
@@ -214,7 +177,7 @@ export function TimerDisplay({
     return (
       <>
         <BlockDigits ms={shown} />
-        <Digits ms={shown} />
+        <Digits ms={shown} skin={skin} rising={rising} />
         <div className="relative">
           <SegBar on={Math.floor(progress * SEGS)} showNow={active && !over} />
           {hourWaveKey > 0 && <span key={hourWaveKey} className="term-hour-wave" aria-hidden />}
@@ -353,7 +316,7 @@ export function TimerDisplay({
         )}
       </svg>
       <div className="dial-center">
-        <Digits ms={shown} />
+        <Digits ms={shown} skin={skin} rising={rising} />
         <div className="timer-caption">
           <span key={hourWaveKey || undefined} className={`num ${hourWaveKey > 0 ? 'hour-caption-pop' : ''}`.trim()}>
             {caption}

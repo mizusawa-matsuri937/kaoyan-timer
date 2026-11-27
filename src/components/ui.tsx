@@ -3,6 +3,7 @@ import {
   memo,
   useEffect,
   useId,
+  useLayoutEffect,
   useRef,
   useState,
   type CSSProperties,
@@ -145,6 +146,10 @@ export function Sheet({
   )
 }
 
+/**
+ * #03 · 3D 翻叶分段控件（参考 UI Moments Leaf Tabs）：
+ * 纸感/新粗野切换时滑块沿 3D 透视平面起跳翻转（rotateY ±180° + translateZ）；终端极客保持干脆分步平推。
+ */
 export function Segmented<T extends string>({
   value,
   options,
@@ -154,10 +159,65 @@ export function Segmented<T extends string>({
   options: Array<{ value: T; label: string }>
   onChange: (v: T, origin?: TransitionOrigin) => void
 }) {
-  // 选中项的底色是一块会滑动的滑块（.seg::before），位置由这两个变量决定
+  const skin = useSkin()
   const index = options.findIndex((o) => o.value === value)
+  const trackRef = useRef<HTMLDivElement>(null)
+  const leafRef = useRef<HTMLSpanElement>(null)
+  const prevIdxRef = useRef<number>(index)
+  const flipAnimRef = useRef<Animation | null>(null)
+
+  useLayoutEffect(() => {
+    const prev = prevIdxRef.current
+    prevIdxRef.current = index
+    const track = trackRef.current
+    const leaf = leafRef.current
+    if (!track || !leaf || index < 0 || prev < 0 || prev === index) return
+    if (
+      typeof leaf.animate !== 'function' ||
+      window.matchMedia?.('(prefers-reduced-motion: reduce)').matches ||
+      skin === 'terminal'
+    ) {
+      return
+    }
+    const buttons = track.querySelectorAll<HTMLButtonElement>('.seg-item')
+    const fromBtn = buttons[prev]
+    const toBtn = buttons[index]
+    if (!fromBtn || !toBtn) return
+
+    const pad = parseFloat(getComputedStyle(track).getPropertyValue('--seg-pad')) || 0
+    const fromX = fromBtn.offsetLeft - pad
+    const toX = toBtn.offsetLeft - pad
+    const turn = index > prev ? -180 : 180
+    flipAnimRef.current?.cancel()
+    flipAnimRef.current = leaf.animate(
+      [
+        { transform: `translateX(${fromX.toFixed(1)}px) rotateY(0deg)`, filter: 'brightness(1)' },
+        {
+          transform: `translateX(${((fromX + toX) / 2).toFixed(1)}px) translateZ(14px) rotateY(${turn / 2}deg) scaleY(1.07)`,
+          filter: 'brightness(0.86)',
+          offset: 0.5,
+        },
+        { transform: `translateX(${toX.toFixed(1)}px) rotateY(${turn}deg)`, filter: 'brightness(1)' },
+      ],
+      {
+        duration: skin === 'brutal' ? 360 : 440,
+        easing: 'cubic-bezier(0.45, 0.05, 0.25, 1)',
+      },
+    )
+    return () => {
+      flipAnimRef.current?.cancel()
+    }
+  }, [index, skin])
+
   return (
-    <div className="seg" style={{ '--seg-n': options.length, '--seg-i': index } as CSSProperties} data-none={index < 0 ? '' : undefined}>
+    <div
+      ref={trackRef}
+      className="seg"
+      data-leaf=""
+      style={{ '--seg-n': options.length, '--seg-i': index } as CSSProperties}
+      data-none={index < 0 ? '' : undefined}
+    >
+      {index >= 0 && <span ref={leafRef} className="seg-leaf" aria-hidden />}
       {options.map((o) => (
         <button
           key={o.value}
@@ -453,12 +513,26 @@ export function Stat({
   )
 }
 
-/** 进度条；不传 color 时用主题强调色 */
-export const Bar = memo(function Bar({ pct, color, height }: { pct: number; color?: string; height?: number }) {
+/** 进度条；不传 color 时用主题强调色；传入 delayIndex 时随数据切换做错峰弹性联动 */
+export const Bar = memo(function Bar({
+  pct,
+  color,
+  height,
+  delayIndex,
+}: {
+  pct: number
+  color?: string
+  height?: number
+  delayIndex?: number
+}) {
   const clamped = Math.round(Math.max(0, Math.min(100, pct)) * 100) / 100
-  const style = { ...(color ? tint(color) : null), ...(height ? { '--bar-h': `${height}px` } : null) } as CSSProperties
+  const style = {
+    ...(color ? tint(color) : null),
+    ...(height ? { '--bar-h': `${height}px` } : null),
+    ...(delayIndex !== undefined ? { '--bar-idx': delayIndex } : null),
+  } as CSSProperties
   return (
-    <div className={`bar ${color ? 'c' : ''}`} style={style}>
+    <div className={`bar ${color ? 'c' : ''}`} data-stagger={delayIndex !== undefined ? '' : undefined} style={style}>
       <i style={{ width: `${clamped}%` }} />
     </div>
   )

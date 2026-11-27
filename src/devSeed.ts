@@ -1,3 +1,4 @@
+import { clearDailyGoals, seedGoalsByDay } from './dailyGoals'
 import { db, setMeta } from './db/db'
 import { addDays, dayKey, parseDay } from './domain/dates'
 import type { ActiveTimer, Segment, Session, Settings } from './domain/types'
@@ -271,6 +272,28 @@ export async function applyDevSeedData(silent = false): Promise<void> {
     await setMeta('timerRev', (active?.rev ?? 0) + 1)
   })
   await reloadFromDb()
+  const today = dayKey(Date.now())
+  seedGoalsByDay({
+    [today]: [
+      { text: '高数错题复盘 1.5h', done: true },
+      { text: '408 操作系统 PV 真题', done: false },
+      { text: '英语一阅读 2 篇', done: false },
+    ],
+    [addDays(today, -1)]: [
+      { text: '数据结构图论大题 6 道', done: true },
+      { text: '高数中值定理专题', done: true },
+      { text: '英语作文小模板背诵', done: true },
+    ],
+    [addDays(today, -2)]: [
+      { text: '计组 Cache 映射刷题', done: true },
+      { text: '线代特征值综合题', done: true },
+      { text: '政治马原单选 1 章', done: false },
+    ],
+    [addDays(today, -3)]: [
+      { text: '计网 TCP 拥塞控制梳理', done: true },
+      { text: '英语真题 2021 完型+阅读', done: true },
+    ],
+  })
   if (!silent) {
     showToast(`已灌入 ${sessions.length} 条学习记录（点计时页「结束」可立测跨级高光！）`, 'success')
   }
@@ -328,5 +351,6 @@ export async function clearAllDevData(): Promise<void> {
     await setMeta('timerRev', Date.now() % 100000)
   })
   await reloadFromDb()
+  clearDailyGoals()
   showToast('已清空本地测试数据', 'info')
 }

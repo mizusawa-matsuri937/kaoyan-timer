@@ -22,10 +22,11 @@ import { addDays, formatClock, formatDayCN, parseDay } from '../domain/dates'
 import { formatDuration, formatDurationCN } from '../domain/format'
 import { SUBJECTS, getSubject } from '../domain/subjects'
 import type { Session } from '../domain/types'
+import { addGoalForDay, removeGoalForDay, toggleGoalForDay, useGoalsForDay } from '../dailyGoals'
 import { useSkin } from '../skin'
 import { DayTimelineRing } from './DayTimelineRing'
 import { HEAT_VARS } from './Heatmap'
-import { IconChevron, IconPlus } from './icons'
+import { IconChevron, IconClose, IconPlus } from './icons'
 import { Bar, Sheet, tint } from './ui'
 
 const EMPTY_SESSIONS: Session[] = []
@@ -75,6 +76,98 @@ function liveForDay(live: LiveSliceInput | null | undefined, day: string): LiveS
   }
   return null
 }
+
+const DayGoalsSection = memo(function DayGoalsSection({ day }: { day: string }) {
+  const skin = useSkin()
+  const goals = useGoalsForDay(day)
+  const [adding, setAdding] = useState(false)
+  const [draft, setDraft] = useState('')
+  const doneCount = goals.filter((g) => g.done).length
+  const allDone = goals.length > 0 && doneCount === goals.length
+
+  const submit = (e: React.FormEvent) => {
+    e.preventDefault()
+    if (addGoalForDay(day, draft)) {
+      setDraft('')
+      if (goals.length + 1 >= 6) setAdding(false)
+    }
+  }
+
+  return (
+    <div className="mt-5">
+      <div className="mb-2 flex items-center justify-between gap-2">
+        <div className="flex items-center gap-2">
+          <span className="section-title">当日微目标</span>
+          {goals.length > 0 && (
+            <span className="goals-badge num" data-complete={allDone ? '' : undefined}>
+              {allDone
+                ? skin === 'terminal'
+                  ? `[${doneCount}/${goals.length} OK]`
+                  : `✓ 已完成 ${doneCount}/${goals.length}`
+                : `${doneCount}/${goals.length}`}
+            </span>
+          )}
+        </div>
+        {goals.length < 6 && (
+          <button
+            type="button"
+            onClick={() => setAdding((v) => !v)}
+            className="flex items-center gap-0.5 text-xs font-semibold text-accent"
+          >
+            <IconPlus size={14} /> {adding ? '收起' : '补记'}
+          </button>
+        )}
+      </div>
+
+      {goals.length > 0 ? (
+        <div className="well px-3 py-2">
+          <fieldset className="stroke-list !mt-0">
+            <legend className="sr-only">{day} 微目标完成情况</legend>
+            {goals.map((g) => (
+              <div key={g.id} className="stroke-row">
+                <label className="stroke-item">
+                  <input type="checkbox" checked={g.done} onChange={() => toggleGoalForDay(day, g.id)} />
+                  <span className="stroke-box" aria-hidden>
+                    <svg viewBox="0 0 16 16">
+                      <path d="M3.5 8.5l3 3 6-7" />
+                    </svg>
+                  </span>
+                  <span className="stroke-text">{g.text}</span>
+                </label>
+                <button
+                  type="button"
+                  className="stroke-del"
+                  aria-label={`删除「${g.text}」`}
+                  onClick={() => removeGoalForDay(day, g.id)}
+                >
+                  <IconClose size={13} />
+                </button>
+              </div>
+            ))}
+          </fieldset>
+        </div>
+      ) : (
+        !adding && <div className="well px-4 py-3 text-center text-xs text-muted">这天没有记录微目标</div>
+      )}
+
+      {adding && (
+        <form className="goals-form" onSubmit={submit} onPointerDown={(e) => e.stopPropagation()}>
+          <input
+            type="text"
+            className="field !py-1.5 !text-sm"
+            placeholder="为这一天补记一项微目标"
+            maxLength={28}
+            value={draft}
+            onChange={(e) => setDraft(e.target.value)}
+          />
+          <button type="submit" className="btn btn-primary !py-1.5 !px-3 !text-sm shrink-0" disabled={!draft.trim()}>
+            加入
+          </button>
+        </form>
+      )}
+    </div>
+  )
+})
 
 const DayPane = memo(function DayPane({
   day,
@@ -155,6 +248,8 @@ const DayPane = memo(function DayPane({
           ))}
         </div>
       )}
+
+      <DayGoalsSection day={day} />
 
       <div className="mt-6 mb-2 flex items-center justify-between">
         <span className="section-title">学习记录（{sessions.length}）</span>

@@ -3,6 +3,7 @@ import { formatDurationCN } from '../domain/format'
 import { getSubject } from '../domain/subjects'
 import { isOvertime } from '../domain/timer'
 import { overtimeMs, resolveOvertime, showToast, useApp, type OvertimeChoice } from '../store'
+import { HoldConfirmButton } from './ConfirmControls'
 import { Button, DateTimeField, Sheet } from './ui'
 
 const pad = (n: number) => String(n).padStart(2, '0')
@@ -90,13 +91,14 @@ export function OvertimeDialog() {
           >
             设置实际结束时间
           </Button>
-          <Button
+          <HoldConfirmButton
             variant="danger"
             disabled={saving}
+            hint="长按 1 秒确认丢弃，防止误触"
             onClick={() => submit({ kind: 'discard' })}
           >
             丢弃这一段
-          </Button>
+          </HoldConfirmButton>
         </div>
       ) : (
         <div key="endAt" className="modal-swap grid gap-3">

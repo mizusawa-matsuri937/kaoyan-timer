@@ -1,8 +1,12 @@
 import { AnimatePresence, LayoutGroup, motion } from 'framer-motion'
 import { useCallback, useEffect, useMemo, useRef, useState, type CSSProperties, type PointerEvent } from 'react'
+import { SwipeConfirm } from '../components/ConfirmControls'
+import { DailyGoalsCard } from '../components/DailyGoalsCard'
 import { HEAT_VARS } from '../components/Heatmap'
 import { IconPlayPause, IconStop } from '../components/icons'
+import { OdometerText } from '../components/Odometer'
 import { SubjectGrid, type SubjectTab } from '../components/SubjectGrid'
+import { TideOrb } from '../components/TideOrb'
 import { TimerDisplay } from '../components/TimerDisplay'
 import { Button, Bar, Sheet, Stat, tint } from '../components/ui'
 import { examPrepProgress, heatLevel, heatTierProgress, LEVEL_LABELS, withLive } from '../domain/aggregate'
@@ -10,7 +14,6 @@ import { dayKey, diffDays } from '../domain/dates'
 import { formatDuration, formatDurationCeil, formatHMS } from '../domain/format'
 import { getSubject, isMockSubject, SUBJECTS } from '../domain/subjects'
 import { elapsed, liveSegments } from '../domain/timer'
-import { useAnimatedNumber } from '../hooks/useAnimatedNumber'
 import { useNow } from '../hooks/useNow'
 import { useBaseDaily, useLiveDaily } from '../hooks/useStats'
 import { useWakeLock } from '../hooks/useWakeLock'
@@ -99,7 +102,6 @@ export function TimerPage() {
 
   const todayStat = daily.get(today)
   const todayTotal = todayStat?.total ?? 0
-  const animatedTodayTotal = useAnimatedNumber(todayTotal, skin)
   const countdown = diffDays(today, settings.examDate)
   const tier = useMemo(() => heatTierProgress(todayTotal), [todayTotal])
   const effectiveStart = useMemo(() => {
@@ -297,9 +299,11 @@ export function TimerPage() {
 
   const primaryLabel = !active ? (examMs ? '开始考试' : '开始') : running ? '暂停' : '继续'
 
+  const tideImpulse = (archived?.id ?? 0) + (levelUpFx?.id ?? 0)
+
   return (
     <div className="px-4 pb-6">
-      <header className="grid grid-cols-2 gap-3 pt-2">
+      <header className="grid grid-cols-[0.86fr_1.14fr] gap-3 pt-2">
         <Stat
           label={countdown >= 0 ? '距离初试' : '初试已过'}
           value={Math.abs(countdown)}
@@ -312,7 +316,7 @@ export function TimerPage() {
                 {countdown >= 0 ? (
                   <>
                     <span className="truncate">第 {prep.week} 周</span>
-                    <span className="shrink-0">已走过 {Math.floor(prep.pct)}%</span>
+                    <span className="shrink-0">已走 {Math.floor(prep.pct)}%</span>
                   </>
                 ) : (
                   <span className="truncate">初试 {settings.examDate}</span>
@@ -323,9 +327,21 @@ export function TimerPage() {
         />
         <Stat
           label="今日已学"
-          value={formatDuration(animatedTodayTotal)}
+          value={
+            <div className="stat-tide-row">
+              <OdometerText text={formatDuration(todayTotal)} value={todayTotal} skin={skin} />
+              <TideOrb
+                tierPct={tier.pct}
+                todayMs={todayTotal}
+                level={tier.level}
+                running={running}
+                impulseKey={tideImpulse}
+                size={52}
+              />
+            </div>
+          }
           color={active ? color : THEME_GREEN}
-          className={levelUpFx ? 'stat-levelup' : ''}
+          className={`stat-has-tide ${levelUpFx ? 'stat-levelup' : ''}`.trim()}
           badge={
             levelUpFx ? (
               <span key={levelUpFx.id} className="stat-lvl-badge num">
@@ -344,8 +360,7 @@ export function TimerPage() {
           }
           footer={
             <div className="stat-sub">
-              <Bar pct={tier.pct} height={7} />
-              <div className="stat-meta num mt-1.5">
+              <div className="stat-meta num">
                 <span className="inline-flex min-w-0 items-center gap-1">
                   <span className="relative inline-flex shrink-0 items-center justify-center">
                     {levelUpFx && (
@@ -368,7 +383,6 @@ export function TimerPage() {
                     {tier.remainMs > 0 ? `差 ${formatDurationCeil(tier.remainMs)} 进 ${tier.nextTierLabel}` : tier.nextTierLabel}
                   </span>
                 </span>
-                {todayTotal > 0 && <span className="shrink-0">{Math.floor(tier.pct)}%</span>}
               </div>
             </div>
           }
@@ -447,7 +461,7 @@ export function TimerPage() {
         </AnimatePresence>
 
         <LayoutGroup id="timer-controls">
-          <div className="timer-controls" data-active={active ? '' : undefined}>
+          <div className="timer-controls" data-active={active && examMs === 0 ? '' : undefined}>
             <motion.div
               layout
               transition={
@@ -464,7 +478,7 @@ export function TimerPage() {
               </Button>
             </motion.div>
             <AnimatePresence mode="popLayout" initial={false}>
-              {active && (
+              {active && examMs === 0 && (
                 <motion.div
                   key="stop-btn"
                   layout
@@ -484,10 +498,28 @@ export function TimerPage() {
                   </Button>
                 </motion.div>
               )}
+              {active && examMs > 0 && (
+                <motion.div
+                  key="mock-swipe-stop"
+                  layout
+                  initial={{ opacity: 0, y: 6 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  exit={{ opacity: 0, y: 6 }}
+                  transition={
+                    skin === 'terminal'
+                      ? { duration: 0.12, ease: 'linear' }
+                      : { duration: 0.28, ease: [0.22, 1, 0.36, 1] }
+                  }
+                >
+                  <SwipeConfirm label="滑动交卷并结束模考" doneLabel="✓ 已交卷并归档" onConfirm={handleStop} />
+                </motion.div>
+              )}
             </AnimatePresence>
           </div>
         </LayoutGroup>
       </section>
+
+      <DailyGoalsCard />
 
       <SubjectGrid
         tab={subjectTab}
@@ -512,11 +544,13 @@ export function TimerPage() {
               <b className="num text-ink">{formatHMS(ms)}</b>），切换科目会立即结算并结束本场模考。确定切换到{' '}
               <b style={{ color: targetSwitchSub.color }}>{targetSwitchSub.name}</b> 吗？
             </p>
-            <div className="grid gap-2.5">
+            <div className="grid gap-3">
               <Button onClick={() => setConfirmSwitchId(null)}>继续当前考试</Button>
-              <Button
-                variant="danger"
-                onClick={() => {
+              <SwipeConfirm
+                tone="danger"
+                label="滑动结束当前模考并切换"
+                doneLabel="✓ 正在切换科目…"
+                onConfirm={() => {
                   const nextId = confirmSwitchId
                   setConfirmSwitchId(null)
                   if (nextId) {
@@ -524,9 +558,7 @@ export function TimerPage() {
                     void selectSubjectAndStart(nextId)
                   }
                 }}
-              >
-                结束考试并切换
-              </Button>
+              />
             </div>
           </>
         )}

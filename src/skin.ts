@@ -177,9 +177,9 @@ const skinSnapshot = () => skin
 const modeSnapshot = () => mode
 
 export function useSkin(): SkinId {
-  return useSyncExternalStore(subscribe, skinSnapshot)
+  return useSyncExternalStore(subscribe, skinSnapshot, skinSnapshot)
 }
 
 export function useMode(): ModeId {
-  return useSyncExternalStore(subscribe, modeSnapshot)
+  return useSyncExternalStore(subscribe, modeSnapshot, modeSnapshot)
 }

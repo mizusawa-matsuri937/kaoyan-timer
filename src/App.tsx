@@ -1,6 +1,7 @@
 import { Activity, lazy, Suspense, useEffect, useLayoutEffect, useRef, useState, type CSSProperties, type ReactNode } from 'react'
 import { ErrorBoundary } from './components/ErrorBoundary'
 import { OvertimeDialog } from './components/OvertimeDialog'
+import { SkinLoader } from './components/SkinLoader'
 import { TabBar, type TabId } from './components/TabBar'
 import { ToastHost } from './components/ui'
 import { UpdatePrompt } from './components/UpdatePrompt'
@@ -31,7 +32,7 @@ const PAGES: Array<{ id: TabId; node: ReactNode }> = [
   {
     id: 'stats',
     node: (
-      <Suspense fallback={<div className="p-8 text-center text-sm text-muted">加载中…</div>}>
+      <Suspense fallback={<div className="flex min-h-[45vh] items-center justify-center p-8"><SkinLoader size={52} label="加载统计图表…" /></div>}>
         <StatsPage />
       </Suspense>
     ),
@@ -88,7 +89,7 @@ export function App() {
   if (!loaded) {
     return (
       <div className="flex h-full items-center justify-center">
-        <div className="h-8 w-8 animate-spin rounded-full border-[3px] border-t-transparent" style={{ borderColor: 'var(--accent)', borderTopColor: 'transparent' }} />
+        <SkinLoader size={60} label="载入学习记录…" />
       </div>
     )
   }

@@ -68,6 +68,8 @@ export const Heatmap = memo(function Heatmap({
   const trackRef = useRef<HTMLDivElement>(null)
   const tipRef = useRef<HTMLDivElement>(null)
   const activeCellRef = useRef<HTMLElement | null>(null)
+  const magnetCellsRef = useRef<Set<HTMLButtonElement>>(new Set())
+  const magnetRafRef = useRef(0)
   const [viewW, setViewW] = useState(0)
   const [tipDay, setTipDay] = useState<string | null>(null)
 
@@ -257,11 +259,25 @@ export const Heatmap = memo(function Heatmap({
     }
   }, [spotlightLevel, viewW, from, to, today, daily, gridStart, step, visible, skin])
 
+  const clearMagnet = useCallback(() => {
+    cancelAnimationFrame(magnetRafRef.current)
+    magnetRafRef.current = 0
+    for (const cell of magnetCellsRef.current) {
+      cell.style.removeProperty('--mag-x')
+      cell.style.removeProperty('--mag-y')
+      cell.style.removeProperty('--mag-s')
+    }
+    magnetCellsRef.current.clear()
+  }, [])
+
+  useEffect(() => () => clearMagnet(), [clearMagnet])
+
   const onScroll = () => {
     const el = scrollRef.current
     // 隐藏时宽度为 0，那时的清零不是用户滚的，不记
     if (el && el.clientWidth > 0 && saved.current) saved.current.left = el.scrollLeft
     if (tipDay) setTipDay(null)
+    clearMagnet()
     syncMonths()
   }
 
@@ -319,6 +335,69 @@ export const Heatmap = memo(function Heatmap({
     if (!cell || cell.disabled || !cell.dataset.day) return
     activeCellRef.current = cell
     setTipDay(cell.dataset.day)
+  }
+
+  /** #10A · 热度磁吸微引力场（仅计算光标周围 5×5 邻域，O(1) 零卡顿，触屏滚动时自动关闭） */
+  const onTrackPointerMove = (e: PointerEvent<HTMLDivElement>) => {
+    if (e.pointerType !== 'mouse' && e.pointerType !== 'pen') return
+    if (window.matchMedia?.('(prefers-reduced-motion: reduce)').matches) return
+    const clientX = e.clientX
+    const clientY = e.clientY
+    if (magnetRafRef.current) return
+    magnetRafRef.current = requestAnimationFrame(() => {
+      magnetRafRef.current = 0
+      const track = trackRef.current
+      if (!track || step <= 0) return
+      const tr = track.getBoundingClientRect()
+      const lx = clientX - tr.left
+      const ly = clientY - tr.top
+      const centerCol = Math.floor((lx - PAD) / step)
+      const centerRow = Math.floor((ly - 20) / step)
+
+      const nextSet = new Set<HTMLButtonElement>()
+      const colNodes = track.children
+      const maxPullPx = skin === 'terminal' ? 1.5 : 3.2
+      const maxScaleBoost = skin === 'terminal' ? 0.05 : 0.13
+      const radius = Math.max(54, step * 2.75)
+
+      const minC = Math.max(0, centerCol - 2)
+      const maxC = Math.min(cols - 1, centerCol + 2)
+      const minR = Math.max(0, centerRow - 2)
+      const maxR = Math.min(6, centerRow + 2)
+
+      for (let c = minC; c <= maxC; c++) {
+        const colEl = colNodes[c] as HTMLElement | undefined
+        if (!colEl) continue
+        for (let r = minR; r <= maxR; r++) {
+          const cell = colEl.querySelector<HTMLButtonElement>(`.heat-day[data-r="${r}"]`)
+          if (!cell || cell.disabled) continue
+          const cellCenterX = PAD + c * step + (step - GAP) / 2
+          const cellCenterY = 20 + r * step + (step - GAP) / 2
+          const dx = lx - cellCenterX
+          const dy = ly - cellCenterY
+          const dist = Math.hypot(dx, dy)
+          const pull = Math.max(0, 1 - dist / radius)
+          if (pull > 0.01) {
+            const mx = ((dx / (dist || 1)) * pull * maxPullPx).toFixed(2)
+            const my = ((dy / (dist || 1)) * pull * maxPullPx).toFixed(2)
+            const sc = (1 + pull * maxScaleBoost).toFixed(3)
+            cell.style.setProperty('--mag-x', `${mx}px`)
+            cell.style.setProperty('--mag-y', `${my}px`)
+            cell.style.setProperty('--mag-s', sc)
+            nextSet.add(cell)
+          }
+        }
+      }
+
+      for (const oldCell of magnetCellsRef.current) {
+        if (!nextSet.has(oldCell)) {
+          oldCell.style.removeProperty('--mag-x')
+          oldCell.style.removeProperty('--mag-y')
+          oldCell.style.removeProperty('--mag-s')
+        }
+      }
+      magnetCellsRef.current = nextSet
+    })
   }
 
   const onFocus = (e: FocusEvent<HTMLDivElement>) => {
@@ -438,7 +517,10 @@ export const Heatmap = memo(function Heatmap({
       ref={heatRef}
       className="heat relative"
       style={{ '--cell': `${step - GAP}px`, '--step': `${step}px` } as CSSProperties}
-      onPointerLeave={() => setTipDay(null)}
+      onPointerLeave={() => {
+        setTipDay(null)
+        clearMagnet()
+      }}
     >
       {/* 共享锚点碰撞感知悬浮预览气泡 */}
       <div
@@ -482,6 +564,7 @@ export const Heatmap = memo(function Heatmap({
           data-spot={spotlightLevel != null ? String(spotlightLevel) : undefined}
           onClick={onClick}
           onPointerOver={onPointerOver}
+          onPointerMove={onTrackPointerMove}
           onKeyDown={onKeyDown}
           onFocus={onFocus}
           onBlur={onBlur}

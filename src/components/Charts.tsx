@@ -3,8 +3,8 @@ import { Bar, BarChart, Cell, Pie, PieChart, ResponsiveContainer, Tooltip, XAxis
 import type { TrendPoint } from '../domain/aggregate'
 import { formatDuration } from '../domain/format'
 import { GROUPS } from '../domain/subjects'
-import { useAnimatedNumber } from '../hooks/useAnimatedNumber'
 import { useSkin } from '../skin'
+import { OdometerText } from './Odometer'
 
 const skinColor = (hex: string) => `color-mix(in srgb, ${hex} var(--c-mark-pct), var(--c-ink-to))`
 
@@ -42,7 +42,6 @@ export function ShareDonut({ data }: { data: Array<{ name: string; value: number
   prevReplay.current = replay
 
   const total = data.reduce((a, d) => a + d.value, 0)
-  const animatedTotal = useAnimatedNumber(total, skin)
   const shown = data.filter((d) => d.value > 0)
   const hasData = shown.length > 0
   const dur = skin === 'terminal' ? 220 : skin === 'brutal' ? 320 : 420
@@ -72,27 +71,30 @@ export function ShareDonut({ data }: { data: Array<{ name: string; value: number
       </ResponsiveContainer>
       <div className="pointer-events-none absolute inset-0 flex flex-col items-center justify-center">
         <div className="text-[11px] text-muted">合计</div>
-        <div className="num text-lg font-semibold">{formatDuration(animatedTotal)}</div>
+        <div className="num text-lg font-semibold">
+          <OdometerText text={formatDuration(total)} value={total} skin={skin} />
+        </div>
       </div>
     </div>
   )
 }
 
-export function TrendChart({ data }: { data: TrendPoint[] }) {
+export function TrendChart({ data, unitKey = 'day' }: { data: TrendPoint[]; unitKey?: string }) {
   const skin = useSkin()
   const replay = useShowCount()
-  const dur = skin === 'terminal' ? 200 : skin === 'brutal' ? 300 : 380
-  const rows = data.map((p) => ({
-    label: p.label,
-    cs408: +(p.cs408 / 3600000).toFixed(2),
-    math: +(p.math / 3600000).toFixed(2),
-    english: +(p.english / 3600000).toFixed(2),
-    politics: +(p.politics / 3600000).toFixed(2),
-  }))
+  const dur = skin === 'terminal' ? 200 : skin === 'brutal' ? 340 : 440
+  const rows = data.map((p) => {
+    const cs408 = +(p.cs408 / 3600000).toFixed(2)
+    const math = +(p.math / 3600000).toFixed(2)
+    const english = +(p.english / 3600000).toFixed(2)
+    const politics = +(p.politics / 3600000).toFixed(2)
+    return { label: p.label, cs408, math, english, politics, sum: cs408 + math + english + politics }
+  })
+  const peakSum = Math.max(0, ...rows.map((r) => r.sum))
   return (
     <div className="h-52 w-full">
       <ResponsiveContainer width="100%" height="100%">
-        <BarChart key={replay} data={rows} margin={{ top: 8, right: 4, left: -18, bottom: 0 }}>
+        <BarChart key={`${replay}-${unitKey}`} data={rows} margin={{ top: 8, right: 4, left: -18, bottom: 0 }}>
           <XAxis
             dataKey="label"
             tick={{ fontSize: 10, fill: 'var(--muted)' }}
@@ -113,10 +115,19 @@ export function TrendChart({ data }: { data: TrendPoint[] }) {
               dataKey={g.id}
               stackId="a"
               fill={skinColor(g.color)}
-              radius={skin === 'terminal' ? 0 : i === GROUPS.length - 1 ? [2, 2, 0, 0] : 0}
+              radius={skin === 'terminal' ? 0 : i === GROUPS.length - 1 ? [3, 3, 0, 0] : 0}
+              animationBegin={i * 36}
               animationDuration={dur}
               animationEasing="ease-out"
-            />
+            >
+              {rows.map((r, rIdx) => (
+                <Cell
+                  key={rIdx}
+                  fill={skinColor(g.color)}
+                  fillOpacity={peakSum > 0 && r.sum === peakSum ? 1 : 0.82}
+                />
+              ))}
+            </Bar>
           ))}
         </BarChart>
       </ResponsiveContainer>

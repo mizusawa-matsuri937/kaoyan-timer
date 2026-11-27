@@ -1,5 +1,8 @@
 import { useEffect, useRef, useState, type ReactNode } from 'react'
-import { IconCloud, IconEye, IconEyeOff } from '../components/icons'
+import { DownloadRingButton, PaperPlaneSyncButton, TokenStrengthInput } from '../components/ActionFeedback'
+import { HoldConfirmButton } from '../components/ConfirmControls'
+import { IconCloud } from '../components/icons'
+import { NotchSlider } from '../components/NotchSlider'
 import { SkinPicker } from '../components/SkinPicker'
 import { Button, SectionTitle, Sheet, Toggle } from '../components/ui'
 import { dayKey } from '../domain/dates'
@@ -56,7 +59,6 @@ export function SettingsPage() {
   const [showHelp, setShowHelp] = useState(!cfg)
   const [usage, setUsage] = useState<string | null>(null)
   const [dateDraft, setDateDraft] = useState<Partial<Record<'examDate' | 'startDate', string>>>({})
-  const [showToken, setShowToken] = useState(false)
   const [pastedToken, setPastedToken] = useState(false)
   const [confirmDisableSync, setConfirmDisableSync] = useState(false)
 
@@ -211,18 +213,14 @@ export function SettingsPage() {
         <div className="py-3">
           <div className="text-[15px]">忘记结束提醒</div>
           <div className="text-xs text-muted">单段连续计时超过该时长，回来时询问</div>
-          <div className="mt-2.5 grid grid-cols-6 gap-1.5" role="group" aria-label="忘记结束提醒小时数">
-            {OVERTIME_OPTIONS.map((h) => (
-              <button
-                key={h}
-                type="button"
-                aria-pressed={settings.overtimeHours === h}
-                onClick={() => updateSettings({ overtimeHours: h })}
-                className="hour-chip num"
-              >
-                {h}h
-              </button>
-            ))}
+          <div className="mt-3">
+            <NotchSlider
+              options={OVERTIME_OPTIONS}
+              value={settings.overtimeHours}
+              onChange={(h) => void updateSettings({ overtimeHours: h })}
+              formatLabel={(h) => `${h}h`}
+              ariaLabel="忘记结束提醒小时数"
+            />
           </div>
         </div>
         {wakeLockSupported && (
@@ -273,29 +271,12 @@ export function SettingsPage() {
             autoCapitalize="off"
             autoCorrect="off"
           />
-          <div className="field-token-wrap">
-            <input
-              className="field !pr-20"
-              type={showToken ? 'text' : 'password'}
-              placeholder="Fine-grained Token（github_pat_…）"
-              value={token}
-              onChange={(e) => setToken(e.target.value)}
-              onPaste={() => setPastedToken(true)}
-              autoCapitalize="off"
-              autoCorrect="off"
-            />
-            <div className="field-token-actions">
-              {pastedToken && <span className="token-pasted-badge">已粘贴</span>}
-              <button
-                type="button"
-                className="field-eye"
-                aria-label={showToken ? '隐藏 Token' : '显示 Token'}
-                onClick={() => setShowToken((v) => !v)}
-              >
-                {showToken ? <IconEyeOff size={16} /> : <IconEye size={16} />}
-              </button>
-            </div>
-          </div>
+          <TokenStrengthInput
+            value={token}
+            onChange={setToken}
+            pasted={pastedToken}
+            onPaste={() => setPastedToken(true)}
+          />
           <input
             className="field"
             placeholder="文件名"
@@ -309,9 +290,14 @@ export function SettingsPage() {
           <Button onClick={saveCfg} disabled={sync.status === 'syncing'}>
             {cfg ? '保存并同步' : '开启备份'}
           </Button>
-          <Button variant="secondary" onClick={() => syncNow({ manual: true })} disabled={!cfg || sync.status === 'syncing'}>
-            立即同步
-          </Button>
+          <PaperPlaneSyncButton
+            variant="secondary"
+            label="立即同步"
+            doneLabel="已同步备份"
+            syncStatus={sync.status}
+            disabled={!cfg}
+            onClick={() => syncNow({ manual: true })}
+          />
         </div>
         {cfg && (
           <button
@@ -359,9 +345,7 @@ export function SettingsPage() {
           </span>
         </Row>
         <div className="grid grid-cols-2 gap-2.5 py-3">
-          <Button variant="secondary" onClick={doExport}>
-            导出备份
-          </Button>
+          <DownloadRingButton label="导出备份" onDownload={doExport} />
           <Button variant="secondary" onClick={() => fileRef.current?.click()}>
             导入备份
           </Button>
@@ -387,16 +371,17 @@ export function SettingsPage() {
         </p>
         <div className="grid gap-2.5">
           <Button onClick={() => setConfirmDisableSync(false)}>继续保留备份</Button>
-          <Button
+          <HoldConfirmButton
             variant="danger"
+            hint="长按 1 秒确认关闭自动备份"
             onClick={() => {
               setConfirmDisableSync(false)
               void setSyncConfig(null)
               showToast('已关闭 GitHub 自动备份', 'info')
             }}
           >
-            确认关闭
-          </Button>
+            按住确认关闭
+          </HoldConfirmButton>
         </div>
       </Sheet>
     </div>

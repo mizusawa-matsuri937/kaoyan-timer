@@ -182,25 +182,30 @@ html[data-skin='terminal'] .page-in > div > h1.page-title {
   animation-timing-function: steps(7);
 }
 
-/* 计时数字：滚轮槽内新数字入场、旧数字同帧退场（无残影无闪烁） */
-.dial .timer-digits .d,
+/* 计时数字：圆环皮肤大字改由 OdometerDigit 11 格机械滚筒 WAAPI 驱动；终端方块字保持点阵刷新 */
 .blockdigits path {
   animation: var(--m-digit) var(--m-digit-dur) var(--m-digit-ease) both;
-}
-.dial .timer-digits .d-out {
-  animation: var(--m-digit-out) var(--m-digit-dur) var(--m-digit-ease) forwards;
 }
 /* 终端皮肤里秒每秒都在跳，不参与刷新闪烁，免得分心 */
 .blockdigits .sec {
   animation: none;
 }
 
-/* 进度条：入场时从左长出来；之后数值变化走 width 过渡（很少发生，元素也很小） */
+/* 进度条：入场时从左长出来；切换统计范围时带 data-stagger 按 --bar-idx 错峰弹性联动 */
 .bar > i {
   transform-origin: left;
   transition: width 0.5s var(--m-bar-w-ease);
   animation: var(--m-bar) var(--m-bar-dur) var(--m-bar-ease) backwards;
   animation-delay: calc(var(--m-stagger) * var(--ord, 0) + 80ms);
+}
+.bar[data-stagger] > i {
+  transition: width 0.54s cubic-bezier(0.22, 1.18, 0.36, 1) calc(var(--bar-idx, 0) * 32ms);
+}
+html[data-skin='brutal'] .bar[data-stagger] > i {
+  transition: width 0.44s cubic-bezier(0.28, 1.38, 0.48, 1) calc(var(--bar-idx, 0) * 28ms);
+}
+html[data-skin='terminal'] .bar[data-stagger] > i {
+  transition: width 0.24s steps(6) calc(var(--bar-idx, 0) * 20ms);
 }
 /* 每日详情左右切天预渲染与滑入页不再重播入场长条动效，避免切天重绘闪烁 */
 .day-pager-slide[data-static] .bar > i {

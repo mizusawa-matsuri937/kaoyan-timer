@@ -1,6 +1,7 @@
 import { useMemo, useState } from 'react'
 import { ShareDonut, TrendChart } from '../components/Charts'
 import { IconFlame } from '../components/icons'
+import { OdometerText } from '../components/Odometer'
 import { Bar, Segmented, SectionTitle, Stat, tint } from '../components/ui'
 import {
   groupTotals,
@@ -14,15 +15,9 @@ import {
 import { dayKey } from '../domain/dates'
 import { formatDuration, hours1 } from '../domain/format'
 import { GROUPS, subjectsOf } from '../domain/subjects'
-import { useAnimatedNumber } from '../hooks/useAnimatedNumber'
 import { useNow } from '../hooks/useNow'
 import { useLiveDaily } from '../hooks/useStats'
-import { useSkin, type SkinId } from '../skin'
-
-function AnimatedDuration({ ms, skin }: { ms: number; skin: SkinId }) {
-  const animated = useAnimatedNumber(ms, skin)
-  return <>{formatDuration(animated)}</>
-}
+import { useSkin } from '../skin'
 
 const RANGES: Array<{ value: RangeId; label: string }> = [
   { value: 'today', label: '今日' },
@@ -49,7 +44,6 @@ export function StatsPage() {
   const bySubject = useMemo(() => subjectTotals(daily, rangeBounds(range, today)), [daily, range, today])
   const byGroup = groupTotals(bySubject)
   const total = sumValues(bySubject)
-  const animatedTotal = useAnimatedNumber(total, skin)
   const st = useMemo(() => streaks(daily, today), [daily, today])
   const trendData = useMemo(() => trend(daily, today, unit, unit === 'day' ? 14 : 12), [daily, today, unit])
 
@@ -69,20 +63,25 @@ export function StatsPage() {
       <div className="card mt-3 p-4">
         <div>
           <div className="card-legend">考研总学习时长</div>
-          <div className="num mt-1 text-[38px] leading-tight font-semibold">
-            {hours1(animatedTotal)}
+          <div className="num mt-1 flex items-baseline text-[38px] leading-tight font-semibold">
+            <OdometerText text={hours1(total)} value={total} skin={skin} />
             <span className="ml-1.5 text-base font-medium text-muted">小时</span>
           </div>
           <div className="mt-4 flex items-center gap-4">
             <ShareDonut data={GROUPS.map((g) => ({ name: g.name, value: byGroup[g.id], color: g.color }))} />
             <div className="flex-1 space-y-3">
-              {GROUPS.map((g) => (
-                <div key={g.id} className="c flex items-center gap-2 text-sm" style={tint(g.color)}>
-                  <span className="dot" />
-                  <span className="flex-1">{g.name}</span>
-                  <span className="num font-semibold">{total ? Math.round((byGroup[g.id] / total) * 100) : 0}%</span>
-                </div>
-              ))}
+              {GROUPS.map((g) => {
+                const pctVal = total ? Math.round((byGroup[g.id] / total) * 100) : 0
+                return (
+                  <div key={g.id} className="c flex items-center gap-2 text-sm" style={tint(g.color)}>
+                    <span className="dot" />
+                    <span className="flex-1">{g.name}</span>
+                    <span className="num font-semibold">
+                      <OdometerText text={`${pctVal}%`} value={pctVal} skin={skin} />
+                    </span>
+                  </div>
+                )
+              })}
             </div>
           </div>
         </div>
@@ -99,12 +98,12 @@ export function StatsPage() {
                 <span className="text-[16px] font-semibold">{subs.length > 1 ? `${g.name} 汇总` : g.name}</span>
               </div>
               <span className="num text-xl font-semibold">
-                <AnimatedDuration ms={groupMs} skin={skin} />
+                <OdometerText text={formatDuration(groupMs)} value={groupMs} skin={skin} />
               </span>
             </div>
             {subs.length > 1 && (
               <div className="mt-3 space-y-3">
-                {subs.map((s) => {
+                {subs.map((s, sIdx) => {
                   const ms = bySubject[s.id] ?? 0
                   const pct = groupMs ? (ms / groupMs) * 100 : 0
                   return (
@@ -116,7 +115,7 @@ export function StatsPage() {
                           <span className="ml-1.5 text-faint">{Math.round(pct)}%</span>
                         </span>
                       </div>
-                      <Bar pct={pct} color={s.color} />
+                      <Bar pct={pct} color={s.color} delayIndex={sIdx} />
                     </div>
                   )
                 })}
@@ -130,7 +129,7 @@ export function StatsPage() {
       <div className="card p-4">
         <Segmented value={unit} options={TREND} onChange={setUnit} />
         <div className="mt-3">
-          <TrendChart data={trendData} />
+          <TrendChart data={trendData} unitKey={unit} />
         </div>
         <div className="mt-2 flex flex-wrap justify-center gap-3 text-xs text-muted">
           {GROUPS.map((g) => (

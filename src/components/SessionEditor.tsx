@@ -6,6 +6,7 @@ import { SUBJECTS } from '../domain/subjects'
 import type { Session } from '../domain/types'
 import { useSkin } from '../skin'
 import { deleteSession, saveSession, showToast } from '../store'
+import { HoldConfirmButton } from './ConfirmControls'
 import { IconPlus, IconTrash } from './icons'
 import { Button, DateTimeField, Sheet, tint } from './ui'
 
@@ -45,7 +46,7 @@ export function SessionEditor({ target, onClose }: { target: EditorTarget; onClo
   // 注意：前 4 个 useState 顺序与测试夹具契约保持一致
   const [subjectId, setSubjectId] = useState('ds')
   const [rows, setRows] = useState<Row[]>([])
-  const [confirmDel, setConfirmDel] = useState(false)
+  const [, setConfirmDel] = useState(false)
   const [saving, setSaving] = useState(false)
   const [shake, setShake] = useState<{ idx: number; seq: number } | null>(null)
   const skin = useSkin()
@@ -255,18 +256,17 @@ export function SessionEditor({ target, onClose }: { target: EditorTarget; onClo
           保存
         </Button>
         {target?.kind === 'edit' && (
-          <Button
+          <HoldConfirmButton
             variant="danger"
             disabled={saving}
+            icon={<IconTrash size={16} />}
+            hint="长按 1 秒删除，松手立刻撤回"
             onClick={async () => {
-              if (!confirmDel) return setConfirmDel(true)
               await submit(() => deleteSession(target.session.id, { expectedSession: target.session }), '已删除')
             }}
           >
-            <span className="inline-flex items-center gap-1.5">
-              <IconTrash size={16} /> {confirmDel ? '再点一次确认删除' : '删除这条记录'}
-            </span>
-          </Button>
+            按住删除这条记录
+          </HoldConfirmButton>
         )}
       </div>
     </Sheet>
